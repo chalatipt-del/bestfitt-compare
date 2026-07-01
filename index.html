@@ -496,6 +496,7 @@
       <button class="btn secondary" id="openSavedSetsBtn" type="button">ชุดที่บันทึกไว้</button>
       <button class="btn secondary" id="openCustomLibraryBtn" type="button">ข้อมูลที่เพิ่มเอง</button>
       <button class="btn secondary" id="openCompareLogBtn" type="button">ประวัติ Compare</button>
+      <span id="syncStatus" style="font-size:11px; display:none; margin-left:4px;"></span>
     </div>
   </div>
   <div class="stats" id="statsLine"></div>
@@ -694,49 +695,102 @@ const CUSTOM_KEY = 'n5k_custom_dishes';
 function loadCustomDishesFromStorage(){
   try { return JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]'); } catch(e){ return []; }
 }
-function persistCustomDishes(){
+function saveCustomDishesLocal(){
   try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(CUSTOM_DISHES)); } catch(e){}
-  syncCustomDishesToAPI();
+}
+function persistCustomDishes(opts = {}){
+  saveCustomDishesLocal();
+  if(opts.upsert) upsertDishesToAPI(opts.upsert);
+  else if(opts.delete) deleteDishFromAPI(opts.delete);
   updateCustomBadge();
 }
-
 function updateCustomBadge(){
-  const badge = document.getElementById('customBadge');
-  if(!badge) return;
-  if(CUSTOM_DISHES.length > 0){
-    badge.textContent = CUSTOM_DISHES.length;
-    badge.style.display = 'inline-flex';
-  } else {
-    badge.style.display = 'none';
+  // badge element removed from toolbar; function kept for compatibility
+}
+function setSyncStatus(state){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  if(state === 'syncing'){
+    el.textContent = '↑ sync...'; el.style.color = '#999'; el.style.display = 'inline';
+  } else if(state === 'ok'){
+    el.textContent = '✓ sync'; el.style.color = '#4caf50'; el.style.display = 'inline';
+    setTimeout(() => { el.style.display = 'none'; }, 3000);
+  } else if(state === 'retried'){
+    el.textContent = '✓ sync (retry)'; el.style.color = 'orange'; el.style.display = 'inline';
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+  } else if(state === 'error'){
+    el.textContent = '⚠ sync ล้มเหลว'; el.style.color = '#e53935'; el.style.display = 'inline';
   }
 }
-async function syncCustomDishesToAPI(){
+async function warmupGAS(){
+  try { await fetch(GAS_URL + '?type=ping', { cache: 'no-store' }); } catch(e){}
+}
+async function upsertDishesToAPI(dishes){
+  if(!dishes || dishes.length === 0) return;
+  setSyncStatus('syncing');
+  const payload = dishes.map(d => ({
+    ...d,
+    image: d.image && d.image.startsWith('data:') ? '' : (d.image || '')
+  }));
   try {
     await fetch(GAS_URL, {
-      method: 'POST',
-      mode: 'no-cors',
+      method: 'POST', mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ dishes: CUSTOM_DISHES.map(d => ({
-        ...d,
-        image: d.image && d.image.startsWith('data:') ? '' : (d.image || '')
-      })) })
+      body: JSON.stringify({ type: 'custom_dishes_upsert', dishes: payload })
     });
-  } catch(e){ console.warn('Sync to API failed', e); }
+    // Verify after 2.5s
+    await new Promise(r => setTimeout(r, 2500));
+    const res = await fetch(GAS_URL + '?type=custom_dishes', { cache: 'no-store' });
+    if(res.ok){
+      const data = await res.json();
+      const serverIds = new Set(Array.isArray(data) ? data.map(d => d.id) : []);
+      const allSynced = payload.every(d => serverIds.has(d.id));
+      if(!allSynced){
+        // Retry once
+        await fetch(GAS_URL, {
+          method: 'POST', mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ type: 'custom_dishes_upsert', dishes: payload })
+        });
+        setSyncStatus('retried');
+      } else {
+        setSyncStatus('ok');
+      }
+    } else {
+      setSyncStatus('ok');
+    }
+  } catch(e){
+    setSyncStatus('error');
+    console.warn('Upsert to API failed', e);
+  }
+}
+async function deleteDishFromAPI(id){
+  try {
+    await fetch(GAS_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ type: 'custom_dishes_delete', id })
+    });
+  } catch(e){ console.warn('Delete from API failed', e); }
 }
 async function initCustomDishesFromAPI(){
   try {
-    const res = await fetch(GAS_URL);
+    const res = await fetch(GAS_URL + '?type=custom_dishes');
     if(res.ok){
-      const data = await res.json();
-      if(Array.isArray(data) && data.length > 0){
-        CUSTOM_DISHES = data;
-        try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(CUSTOM_DISHES)); } catch(e){}
+      const serverData = await res.json();
+      if(Array.isArray(serverData) && serverData.length > 0){
+        const local = loadCustomDishesFromStorage();
+        const serverIds = new Set(serverData.map(d => d.id));
+        // รายการที่มีแค่ใน local (ยังไม่ sync ขึ้น server)
+        const localOnly = local.filter(d => !serverIds.has(d.id));
+        CUSTOM_DISHES = [...serverData, ...localOnly];
+        saveCustomDishesLocal();
+        if(localOnly.length > 0) upsertDishesToAPI(localOnly);
       } else {
-        // API ว่างอยู่ — ลอง migrate จาก localStorage
         const local = loadCustomDishesFromStorage();
         if(local.length > 0){
           CUSTOM_DISHES = local;
-          syncCustomDishesToAPI();
+          upsertDishesToAPI(local);
         }
       }
     }
@@ -1412,7 +1466,7 @@ document.getElementById('cfSaveBtn').addEventListener('click', () => {
         ingrText: document.getElementById('cfIngr').value.trim(),
         image: cfImageDataUrl || imageUrl || CUSTOM_DISHES[idx].image,
       };
-      persistCustomDishes();
+      persistCustomDishes({ upsert: [CUSTOM_DISHES[idx]] });
     }
     closeCustomModal();
     return;
@@ -1436,7 +1490,7 @@ document.getElementById('cfSaveBtn').addEventListener('click', () => {
   };
 
   CUSTOM_DISHES.push(dish);
-  persistCustomDishes();
+  persistCustomDishes({ upsert: [dish] });
 
   // auto-match: ดึงตัวเลขจากชื่อ แล้วหา dish ที่ ID ตรงกัน
   const nums = dish.label.match(/\d{5,}/g) || [];
@@ -1693,8 +1747,10 @@ customLibraryList.addEventListener('click', e => {
   }
   if(delBtn){
     const id = delBtn.dataset.id;
+    deleteDishFromAPI(id);
     CUSTOM_DISHES = CUSTOM_DISHES.filter(d => d.id !== id);
-    persistCustomDishes();
+    saveCustomDishesLocal();
+    updateCustomBadge();
     COMPARE.delete(id);
     updateCompareBar();
     renderCustomLibraryList();
@@ -2182,6 +2238,7 @@ window.__showApp = function(user) {
       loginAt: new Date().toISOString()
     })
   }).catch(() => {});
+  warmupGAS();
   initCustomDishesFromAPI();
 };
 
