@@ -203,6 +203,12 @@
   }
 
   .loadmore-wrap{ text-align:center; margin-top:28px; }
+  .gallery-pagination{ display:flex; justify-content:center; align-items:center; gap:12px; margin-top:28px; padding:8px 0; }
+  .gallery-pagination .page-info{ font-size:13px; color:var(--ink-soft); min-width:100px; text-align:center; }
+  .gallery-pagination .btn:disabled{ opacity:0.35; cursor:not-allowed; }
+  .gallery-stats{ font-size:12.5px; color:var(--ink-soft); margin-bottom:14px; }
+  .gallery-empty{ text-align:center; color:var(--ink-soft); padding:60px 0; font-size:14px; }
+  .source-by{ font-size:12px; color:var(--ink-soft); margin-top:4px; }
   .empty-filtered{ text-align:center; color:var(--ink-soft); padding:60px 0; font-size:14px; }
 
   /* ---------- gallery ---------- */
@@ -443,6 +449,7 @@
     <input type="file" id="fileInput" accept=".csv" style="display:none">
     <span class="filename" id="sourceStatus"></span>
   </div>
+  <div class="source-by" id="sourceByLine" style="display:none"></div>
   <details class="howto">
     <summary>วิธีได้ลิงก์ Google Sheets (CSV)</summary>
     <ol>
@@ -494,7 +501,14 @@
 </main>
 
 <div class="gallery-view" id="galleryView" style="display:none;">
+  <div class="gallery-stats" id="galleryStatsLine"></div>
   <div class="gallery-grid" id="galleryGrid"></div>
+  <div class="gallery-empty" id="galleryEmpty" style="display:none">ไม่มีจานที่ตรงกับเงื่อนไขนี้</div>
+  <div class="gallery-pagination" id="galleryPagination" style="display:none;">
+    <button class="btn secondary" id="galleryPrevBtn">← ก่อนหน้า</button>
+    <span class="page-info" id="galleryPageInfo"></span>
+    <button class="btn secondary" id="galleryNextBtn">ถัดไป →</button>
+  </div>
 </div>
 
 <div class="modal-bg" id="modalBg">
@@ -612,7 +626,7 @@
           <div class="modal-id">คู่ที่จับคู่ได้อัตโนมัติ</div>
           <div style="font-size:12.5px; color:var(--ink-soft); margin-top:3px;">เลือกคู่ที่ต้องการเพิ่มเข้าเปรียบเทียบ</div>
         </div>
-        <button class="closebtn" id="closeMatchPairsModalBtn">✕</button>
+        <button class="btn secondary" id="closeMatchPairsModalBtn" style="font-size:13px; padding:7px 14px;">← กลับ</button>
       </div>
       <div id="matchPairsList" style="margin-top:16px; display:flex; flex-direction:column; gap:10px; max-height:55vh; overflow-y:auto;"></div>
       <div class="compare-actions" style="margin-top:16px;">
@@ -632,6 +646,9 @@ let CURRENT_USER_NAME = '';
 let FILTERED = [];
 let PAGE_SIZE = 48;
 let shown = 0;
+let galleryPage = 0;
+const GALLERY_PAGE_SIZE = 80;
+let currentView = 'explorer';
 const COMPARE = new Set();
 const COMPARE_MAX = 6;
 const CUSTOM_KEY = 'n5k_custom_dishes';
@@ -663,18 +680,19 @@ async function initCustomDishesFromAPI(){
       if(Array.isArray(data) && data.length > 0){
         CUSTOM_DISHES = data;
         try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(CUSTOM_DISHES)); } catch(e){}
-        return;
-      }
-      // API ว่างอยู่ — ลอง migrate จาก localStorage
-      const local = loadCustomDishesFromStorage();
-      if(local.length > 0){
-        CUSTOM_DISHES = local;
-        syncCustomDishesToAPI(); // push ขึ้น Google Sheets
-        return;
+      } else {
+        // API ว่างอยู่ — ลอง migrate จาก localStorage
+        const local = loadCustomDishesFromStorage();
+        if(local.length > 0){
+          CUSTOM_DISHES = local;
+          syncCustomDishesToAPI();
+        }
       }
     }
   } catch(e){ console.warn('API load failed, using localStorage', e); }
-  CUSTOM_DISHES = loadCustomDishesFromStorage();
+  CUSTOM_DISHES = CUSTOM_DISHES.length ? CUSTOM_DISHES : loadCustomDishesFromStorage();
+  // โหลด shared data source
+  fetchDataSourceFromGAS();
 }
 let CUSTOM_DISHES = loadCustomDishesFromStorage();
 let editingCustomId = null;
@@ -755,11 +773,13 @@ function loadFile(file){
       clearSheetError();
       dropzone.style.display = 'none';
       applyFilters();
+      saveDataSourceToGAS('file', file.name);
     }
   });
 }
 
-function loadFromSheet(url){
+function loadFromSheet(url, opts = {}){
+  // opts: { skipSave, connectedByLabel }
   document.getElementById('sourceStatus').textContent = 'กำลังโหลด...';
   Papa.parse(url, {
     download:true,
@@ -776,16 +796,58 @@ function loadFromSheet(url){
       persistDishesSnapshot();
       localStorage.setItem('n5k_sheet_url', url);
       document.getElementById('sheetUrlInput').value = url;
-      document.getElementById('sourceStatus').textContent = 'เชื่อมต่อ Google Sheets แล้ว';
+      const byLabel = opts.connectedByLabel ? ` · เชื่อมต่อโดย ${opts.connectedByLabel}` : '';
+      document.getElementById('sourceStatus').textContent = `เชื่อมต่อ Google Sheets แล้ว${byLabel}`;
       clearSheetError();
       dropzone.style.display = 'none';
       applyFilters();
+      if(!opts.skipSave) saveDataSourceToGAS('url', url);
     },
     error: () => {
       document.getElementById('sourceStatus').textContent = '';
       showSheetError('โหลดไม่สำเร็จ ตรวจสอบว่า Publish to web เป็น CSV แล้ว และลิงก์ถูกต้อง');
     }
   });
+}
+
+function saveDataSourceToGAS(sourceType, value){
+  fetch(GAS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({
+      type: 'data_source',
+      sourceType,
+      value,
+      connectedBy: CURRENT_USER_NAME,
+      connectedAt: new Date().toISOString()
+    })
+  }).catch(() => {});
+}
+
+async function fetchDataSourceFromGAS(){
+  try {
+    const res = await fetch(GAS_URL + '?type=data_source');
+    if(!res.ok) return;
+    const data = await res.json();
+    if(!data || !data.value) return;
+    const byLine = document.getElementById('sourceByLine');
+    const dt = data.connectedAt ? new Date(data.connectedAt).toLocaleDateString('th-TH') : '';
+    const byInfo = data.connectedBy ? `เชื่อมต่อโดย ${data.connectedBy}${dt ? ' เมื่อ ' + dt : ''}` : '';
+    if(byInfo){ byLine.textContent = byInfo; byLine.style.display = ''; }
+    if(data.sourceType === 'url'){
+      const currentUrl = document.getElementById('sheetUrlInput').value.trim();
+      if(!currentUrl){
+        // ยังไม่มี source — auto-connect จาก GAS
+        loadFromSheet(data.value, { skipSave: true, connectedByLabel: data.connectedBy });
+      }
+    } else if(data.sourceType === 'file'){
+      if(ALL_DISHES.length === 0){
+        document.getElementById('sourceStatus').textContent =
+          `ล่าสุด: ไฟล์ "${data.value}" — กรุณาอัปโหลดไฟล์เพื่อเริ่มใช้งาน`;
+      }
+    }
+  } catch(e){ console.warn('fetchDataSource failed', e); }
 }
 
 function showSheetError(msg){
@@ -853,9 +915,14 @@ function applyFilters(){
   if(sort === 'protein-desc') FILTERED.sort((a,b) => b.protein - a.protein);
   if(sort === 'fat-asc') FILTERED.sort((a,b) => a.fat - b.fat);
 
-  shown = 0;
-  grid.innerHTML = '';
-  renderMore();
+  if(currentView === 'gallery'){
+    galleryPage = 0;
+    renderGallery();
+  } else {
+    shown = 0;
+    grid.innerHTML = '';
+    renderMore();
+  }
   updateStats();
 }
 
@@ -1411,7 +1478,7 @@ function renderMatchPairsList(){
           <label class="match-custom-row" for="mpcheck_${gi}_${ci}">
             <input type="checkbox" class="match-pair-check" id="mpcheck_${gi}_${ci}"
               data-custom-id="${c.id}" data-dish-id="${g.dish.id}">
-            <img src="${c.image}" alt="${c.label}">
+            <img src="${imgSrc(c.image)}" onerror="imgErr(this)" alt="${c.label}">
             <div class="mc-label">
               <div class="name">${c.label}</div>
               <div class="sub">${Math.round(c.kcal)} kcal · F ${c.fat.toFixed(1)}g · C ${c.carb.toFixed(1)}g · P ${c.protein.toFixed(1)}g</div>
@@ -1750,7 +1817,23 @@ function renderGallery(){
     });
   });
 
-  galleryGrid.innerHTML = ALL_DISHES.map(d => {
+  // use same FILTERED as Explorer (reflects current search/sort/kcal filters)
+  const items = FILTERED.length > 0 || ALL_DISHES.length === 0 ? FILTERED : ALL_DISHES;
+  const totalPages = Math.max(1, Math.ceil(items.length / GALLERY_PAGE_SIZE));
+  const start = galleryPage * GALLERY_PAGE_SIZE;
+  const pageItems = items.slice(start, start + GALLERY_PAGE_SIZE);
+
+  // stats
+  const galleryStatsLine = document.getElementById('galleryStatsLine');
+  if(ALL_DISHES.length > 0){
+    const avg = items.length ? Math.round(items.reduce((s,d)=>s+d.kcal,0)/items.length) : 0;
+    galleryStatsLine.textContent = `แสดง ${items.length.toLocaleString()} จาน จากทั้งหมด ${ALL_DISHES.length.toLocaleString()} จาน · แคลอรี่เฉลี่ย ${avg} kcal`;
+  } else {
+    galleryStatsLine.textContent = '';
+  }
+  document.getElementById('galleryEmpty').style.display = (ALL_DISHES.length > 0 && items.length === 0) ? 'block' : 'none';
+
+  galleryGrid.innerHTML = pageItems.map(d => {
     const marks = GALLERY_MARKS[d.id] || [];
     const chips = marks.map(m => `<span class="gallery-mark-chip">✓ ${m.by}</span>`).join('');
     return `
@@ -1767,40 +1850,69 @@ function renderGallery(){
       </div>`;
   }).join('');
 
-  galleryGrid.addEventListener('click', async e => {
-    const copyBtn = e.target.closest('.gcopy-btn');
-    if(copyBtn){
-      e.stopPropagation();
-      const action = copyBtn.dataset.action;
-      const dishId = copyBtn.dataset.id;
-      if(action === 'id'){
-        await copyToClipboard(dishId.replace('dish_',''));
-        flashBtn(copyBtn, '# Copy ID');
-      } else {
-        await copyImageToClipboard(copyBtn.dataset.url);
-        flashBtn(copyBtn, '🖼 Copy รูป');
-      }
-      addMark(dishId);
-      return;
-    }
-    const item = e.target.closest('.gallery-item');
-    if(item) openModal(item.dataset.id);
-  });
+  // update pagination controls
+  const pagination = document.getElementById('galleryPagination');
+  const pageInfo = document.getElementById('galleryPageInfo');
+  const prevBtn = document.getElementById('galleryPrevBtn');
+  const nextBtn = document.getElementById('galleryNextBtn');
+  pagination.style.display = totalPages > 1 ? 'flex' : 'none';
+  pageInfo.textContent = `หน้า ${galleryPage + 1} / ${totalPages}`;
+  prevBtn.disabled = galleryPage === 0;
+  nextBtn.disabled = galleryPage >= totalPages - 1;
+
+  // scroll to top of gallery
+  document.getElementById('galleryView').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// gallery click handler (once, outside renderGallery to avoid stacking)
+document.getElementById('galleryGrid').addEventListener('click', async e => {
+  const copyBtn = e.target.closest('.gcopy-btn');
+  if(copyBtn){
+    e.stopPropagation();
+    const action = copyBtn.dataset.action;
+    const dishId = copyBtn.dataset.id;
+    if(action === 'id'){
+      await copyToClipboard(dishId.replace('dish_',''));
+      flashBtn(copyBtn, '# Copy ID');
+    } else {
+      await copyImageToClipboard(copyBtn.dataset.url);
+      flashBtn(copyBtn, '🖼 Copy รูป');
+    }
+    addMark(dishId);
+    return;
+  }
+  const item = e.target.closest('.gallery-item');
+  if(item) openModal(item.dataset.id);
+});
+
+document.getElementById('galleryPrevBtn').addEventListener('click', () => {
+  if(galleryPage > 0){ galleryPage--; renderGallery(); }
+});
+document.getElementById('galleryNextBtn').addEventListener('click', () => {
+  const items = FILTERED.length > 0 || ALL_DISHES.length === 0 ? FILTERED : ALL_DISHES;
+  const totalPages = Math.max(1, Math.ceil(items.length / GALLERY_PAGE_SIZE));
+  if(galleryPage < totalPages - 1){ galleryPage++; renderGallery(); }
+});
+
 document.getElementById('viewExplorerBtn').addEventListener('click', () => {
+  currentView = 'explorer';
   mainEl.style.display = '';
   galleryView.style.display = 'none';
   document.getElementById('viewExplorerBtn').classList.add('active');
   document.getElementById('viewGalleryBtn').classList.remove('active');
+  // re-render explorer with current FILTERED
+  shown = 0;
+  grid.innerHTML = '';
+  renderMore();
 });
 
 document.getElementById('viewGalleryBtn').addEventListener('click', () => {
+  currentView = 'gallery';
   mainEl.style.display = 'none';
   galleryView.style.display = '';
   document.getElementById('viewGalleryBtn').classList.add('active');
   document.getElementById('viewExplorerBtn').classList.remove('active');
-  galleryGrid.innerHTML = '';
+  galleryPage = 0;
   renderGallery();
 });
 
