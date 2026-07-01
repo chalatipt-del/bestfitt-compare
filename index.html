@@ -1,0 +1,1768 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bestfitt Compare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbxhYM0uUvaUuxkkwVVuWfgbg4Vd7CeANvEMLbfogN6JacS5g1WGvV8Qql70nY9NwsUz/exec';
+</script>
+<style>
+  :root{
+    --bg: #E9EEE7;
+    --paper: #FFFFFF;
+    --ink: #1E2A22;
+    --ink-soft: #5B6B60;
+    --line: #D6DECB;
+    --protein: #2F6F4E;
+    --carb: #C98A2D;
+    --fat: #B14A3B;
+    --tag-bg: rgba(30,42,34,0.78);
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(30,42,34,0.06), 0 8px 24px rgba(30,42,34,0.07);
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'IBM Plex Sans Thai', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{ color:inherit; }
+
+  /* ---------- header / toolbar ---------- */
+  header{
+    position:sticky; top:0; z-index:20;
+    background:rgba(233,238,231,0.92);
+    backdrop-filter: blur(6px);
+    border-bottom:1px solid var(--line);
+    padding:18px 28px 14px;
+  }
+  .titlewrap{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+  h1{
+    font-family:'IBM Plex Sans Thai', sans-serif;
+    font-weight:700;
+    font-size:25px;
+    margin:0;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Sans Thai', sans-serif;
+    font-size:12.5px;
+    color:var(--ink-soft);
+  }
+  .toolbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .toolbar input[type="text"], .toolbar input[type="number"], .toolbar select{
+    font-family:'IBM Plex Sans Thai', sans-serif;
+    font-size:13.5px;
+    padding:8px 12px;
+    border:1px solid var(--line);
+    border-radius:9px;
+    background:var(--paper);
+    color:var(--ink);
+  }
+  .toolbar input:focus-visible, .toolbar select:focus-visible, button:focus-visible, .card:focus-visible{
+    outline:2px solid var(--protein);
+    outline-offset:2px;
+  }
+  .numrange{ display:flex; align-items:center; gap:6px; }
+  .numrange input{ width:78px; }
+  .numrange span{ font-size:12px; color:var(--ink-soft); }
+  label.field-label{ font-size:12px; color:var(--ink-soft); margin-right:4px; }
+  .filegroup{ margin-left:auto; display:flex; align-items:center; gap:10px; }
+  .sourcebar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+  .sourcebar input[type="text"]{
+    font-family:'IBM Plex Sans Thai', sans-serif; font-size:13.5px; padding:9px 12px;
+    border:1px solid var(--line); border-radius:9px; background:var(--paper); color:var(--ink);
+    flex:1; min-width:240px;
+  }
+  .orsep{ font-size:12.5px; color:var(--ink-soft); }
+  .howto{ margin-bottom:14px; font-size:12.5px; color:var(--ink-soft); }
+  .howto summary{ cursor:pointer; }
+  .howto ol{ margin:8px 0 0 18px; padding:0; line-height:1.7; }
+  .howto code{ background:var(--bg); padding:1px 5px; border-radius:4px; font-family:'IBM Plex Mono', monospace; }
+  .sheet-error{ color:var(--fat); font-size:12.5px; margin:-2px 0 10px; }
+  .btn{
+    font-family:'IBM Plex Sans Thai', sans-serif;
+    font-weight:500;
+    font-size:13.5px;
+    padding:9px 16px;
+    border-radius:9px;
+    border:1px solid var(--ink);
+    background:var(--ink);
+    color:var(--paper);
+    cursor:pointer;
+  }
+  .btn.secondary{ background:transparent; color:var(--ink); border-color:var(--line); }
+  .filename{ font-family:'IBM Plex Sans Thai', sans-serif; font-size:12.5px; color:var(--ink-soft); }
+  .stats{ font-family:'IBM Plex Sans Thai', sans-serif; font-size:12.5px; color:var(--ink-soft); margin-top:10px; }
+
+  /* ---------- empty state ---------- */
+  .dropzone{
+    margin:64px auto; max-width:520px;
+    border:1.5px dashed var(--line);
+    border-radius:var(--radius);
+    padding:48px 32px;
+    text-align:center;
+    background:var(--paper);
+  }
+  .dropzone.dragover{ border-color:var(--protein); background:#F2F7F0; }
+  .dropzone p{ color:var(--ink-soft); font-size:14px; line-height:1.6; margin:8px 0 18px; }
+  .dropzone .icon{ font-size:34px; }
+
+  /* ---------- grid ---------- */
+  main{ padding:24px 28px 80px; }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(228px, 1fr));
+    gap:18px;
+  }
+  .card{
+    background:var(--paper);
+    border-radius:var(--radius);
+    overflow:hidden;
+    box-shadow:var(--shadow);
+    cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease;
+    opacity:0; animation:rise .35s ease forwards;
+  }
+  .card:hover{ transform:translateY(-3px); box-shadow:0 4px 8px rgba(30,42,34,0.08), 0 14px 28px rgba(30,42,34,0.12); }
+  @keyframes rise{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+  @media (prefers-reduced-motion: reduce){
+    .card{ animation:none; opacity:1; }
+    .card, .card:hover{ transition:none; transform:none; }
+  }
+  .imgwrap{ position:relative; aspect-ratio:4/3; background:#DCE3D5; overflow:hidden; }
+  .imgwrap img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .tag{
+    position:absolute; top:8px; left:8px;
+    background:var(--tag-bg); color:#fff;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px; padding:3px 7px; border-radius:5px;
+    letter-spacing:0.02em;
+  }
+  .fingerprint{ display:flex; height:5px; }
+  .fingerprint div{ height:100%; }
+  .body{ padding:13px 14px 15px; }
+  .kcalrow{ display:flex; align-items:baseline; gap:6px; margin-bottom:8px; }
+  .kcal{ font-family:'IBM Plex Sans Thai', sans-serif; font-size:25px; font-weight:700; }
+  .kcalunit{ font-size:11px; color:var(--ink-soft); }
+  .macros{ display:flex; gap:10px; font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft); margin-bottom:9px; }
+  .macros b{ color:var(--ink); }
+  .ingr-preview{
+    font-size:12.5px; color:var(--ink-soft); line-height:1.45;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+
+  .loadmore-wrap{ text-align:center; margin-top:28px; }
+  .empty-filtered{ text-align:center; color:var(--ink-soft); padding:60px 0; font-size:14px; }
+
+  /* ---------- gallery ---------- */
+  .gallery-view{ padding:20px 24px 80px; }
+  .gallery-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));
+    gap:8px;
+  }
+  .gallery-item{ position:relative; aspect-ratio:4/3; overflow:hidden; border-radius:10px; background:#1a1a1a; }
+  .gallery-item img{ width:100%; height:100%; object-fit:cover; display:block; transition:transform .2s ease; }
+  .gallery-item:hover img{ transform:scale(1.04); }
+  .gallery-overlay{
+    position:absolute; inset:0;
+    background:rgba(0,0,0,0); opacity:0;
+    display:flex; flex-direction:column; justify-content:flex-end;
+    padding:8px; gap:5px; transition:opacity .15s, background .15s;
+  }
+  .gallery-item:hover .gallery-overlay{ opacity:1; background:rgba(0,0,0,0.52); }
+  .g-id-row{ color:#fff; font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:500; }
+  .g-actions{ display:flex; gap:5px; }
+  .gcopy-btn{
+    font-family:'IBM Plex Sans Thai',sans-serif; font-size:11px; font-weight:500;
+    padding:5px 8px; border-radius:6px; flex:1;
+    border:1px solid rgba(255,255,255,0.4); background:rgba(0,0,0,0.45);
+    color:#fff; cursor:pointer; transition:background .1s;
+  }
+  .gcopy-btn:hover{ background:rgba(255,255,255,0.18); }
+  .gcopy-btn.copied{ background:var(--protein); border-color:var(--protein); }
+  .gallery-mark{
+    position:absolute; top:7px; left:7px;
+    background:var(--protein); color:#fff;
+    font-size:10px; font-family:'IBM Plex Sans Thai',sans-serif;
+    padding:2px 8px; border-radius:20px; pointer-events:none;
+    display:flex; align-items:center; gap:4px;
+  }
+  .gallery-mark-multi{
+    position:absolute; top:7px; left:7px;
+    display:flex; flex-wrap:wrap; gap:3px;
+  }
+  .gallery-mark-chip{
+    background:rgba(47,111,78,0.85); color:#fff;
+    font-size:9.5px; font-family:'IBM Plex Sans Thai',sans-serif;
+    padding:2px 7px; border-radius:20px;
+  }
+  .view-toggle{ display:flex; gap:6px; margin-left:auto; }
+  .view-toggle button{
+    font-family:'IBM Plex Sans Thai',sans-serif; font-size:12.5px;
+    padding:6px 12px; border-radius:7px; border:1px solid var(--line);
+    background:transparent; color:var(--ink-soft); cursor:pointer;
+  }
+  .view-toggle button.active{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+
+  /* ---------- modal ---------- */
+  .modal-bg{
+    position:fixed; inset:0; background:rgba(20,28,22,0.55);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .modal-bg.open{ display:flex; }
+  .modal{
+    background:var(--paper); border-radius:18px; max-width:760px; width:100%;
+    max-height:88vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);
+    animation:pop .18s ease;
+  }
+  @keyframes pop{ from{opacity:0; transform:scale(.97);} to{opacity:1; transform:scale(1);} }
+  @media (prefers-reduced-motion: reduce){ .modal{ animation:none; } }
+  .modal-img{ width:100%; aspect-ratio:16/10; object-fit:cover; display:block; }
+  .modal-body{ padding:24px 28px 30px; }
+  .modal-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .modal-id{ font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--ink-soft); margin-bottom:4px; }
+  .modal-kcal{ font-family:'IBM Plex Sans Thai', sans-serif; font-size:34px; font-weight:700; }
+  .closebtn{
+    border:none; background:var(--bg); width:32px; height:32px; border-radius:50%;
+    font-size:16px; cursor:pointer; flex-shrink:0; color:var(--ink);
+  }
+  .legend{ display:flex; gap:16px; margin:18px 0 14px; font-size:12px; color:var(--ink-soft); }
+  .legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+  .modal-fingerprint{ display:flex; height:10px; border-radius:5px; overflow:hidden; margin-bottom:18px; }
+  .modal-fingerprint div{ height:100%; }
+  .macrogrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:22px; }
+  .macrogrid .cell{ background:var(--bg); border-radius:10px; padding:10px 12px; }
+  .macrogrid .cell .v{ font-family:'IBM Plex Mono', monospace; font-size:16px; font-weight:500; }
+  .macrogrid .cell .l{ font-size:11px; color:var(--ink-soft); }
+  .ingr-title{ font-size:12.5px; color:var(--ink-soft); margin-bottom:8px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:7px; }
+  .chip{ background:var(--bg); border-radius:20px; padding:6px 12px; font-size:12.5px; }
+
+  /* ---------- compare ---------- */
+  .compare-toggle{
+    position:absolute; top:8px; right:8px; width:27px; height:27px; border-radius:50%;
+    background:rgba(255,255,255,0.92); border:1.5px solid var(--line);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    font-size:14px; color:var(--ink-soft); z-index:2; line-height:1;
+  }
+  .compare-toggle:hover{ border-color:var(--protein); }
+  .compare-toggle.active{ background:var(--protein); border-color:var(--protein); color:#fff; }
+  .card.compare-selected{ box-shadow:0 0 0 2px var(--protein), var(--shadow); }
+
+  .comparebar{
+    position:fixed; left:0; right:0; bottom:0; z-index:40;
+    background:var(--ink); color:var(--paper);
+    padding:12px 24px; display:none; align-items:center; gap:14px;
+    box-shadow:0 -6px 24px rgba(0,0,0,0.22);
+  }
+  .comparebar.show{ display:flex; }
+  .comparebar .count{ font-size:13px; white-space:nowrap; }
+  .comparebar .thumbs{ display:flex; gap:6px; flex:1; overflow-x:auto; }
+  .comparebar .thumbs img{ width:36px; height:36px; object-fit:cover; border-radius:7px; flex-shrink:0; }
+  .comparebar button{ white-space:nowrap; }
+  .comparebar .btn{ border-color:rgba(255,255,255,0.3); }
+  .comparebar .btn.secondary{ color:var(--paper); border-color:rgba(255,255,255,0.3); }
+
+  .modal.compare-modal{ max-width:94vw; }
+  .comparetable-wrap{ overflow-x:auto; margin:6px 0 18px; }
+  .comparetable{ width:100%; border-collapse:collapse; font-size:13px; }
+  .comparetable th, .comparetable td{ padding:10px 14px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  .comparetable th.dishcol{ text-align:center; min-width:160px; }
+  .comparetable td.dishcol{ text-align:center; }
+  .compare-pct{ font-size:10.5px; margin-top:3px; }
+  .compare-pct.worse{ color:var(--fat); }
+  .compare-pct.best{ color:var(--protein); font-weight:600; }
+  .comparetable td.rowlabel, .comparetable th.rowlabel{
+    font-weight:600; white-space:nowrap; position:sticky; left:0; background:var(--paper);
+  }
+  .comparetable td.best{ background:rgba(47,111,78,0.12); font-weight:600; }
+  .comparetable img.thumb{ width:96px; height:72px; object-fit:cover; border-radius:8px; display:block; margin:0 auto 6px; }
+  .comparetable .dishid{ font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-soft); text-align:center; display:block; }
+  .compare-legend{ font-size:12px; color:var(--ink-soft); margin-bottom:14px; }
+  .compare-legend .dot{ background:rgba(47,111,78,0.5); width:10px; height:10px; border-radius:3px; }
+  .compare-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+  .savedset-row{ display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; }
+  .savedset-row img.thumb-sm{ width:48px; height:36px; object-fit:cover; border-radius:6px; flex-shrink:0; }
+  .savedset-row .meta{ flex:1; min-width:0; }
+  .savedset-row .meta .name{ font-weight:600; font-size:13.5px; }
+  .savedset-row .meta .sub{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .savedset-empty{ color:var(--ink-soft); font-size:13px; text-align:center; padding:30px 0; }
+  .customform{ display:flex; flex-direction:column; gap:12px; margin-top:16px; }
+  .formfield{ display:flex; flex-direction:column; gap:5px; font-size:12.5px; color:var(--ink-soft); }
+  .formfield input{
+    font-family:'IBM Plex Sans Thai', sans-serif; font-size:13.5px; padding:8px 10px;
+    border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink);
+  }
+  .formrow{ display:flex; gap:12px; }
+  .formrow .formfield{ flex:1; }
+  .compare-toggle.custom-remove{ position:static; width:auto; height:auto; border-radius:6px; padding:2px 7px; font-size:11px; background:var(--bg); border:1px solid var(--line); color:var(--ink-soft); }
+  .compare-thumb-wrap{ position:relative; flex-shrink:0; cursor:pointer; }
+  .compare-thumb-wrap .x{
+    position:absolute; top:-5px; right:-5px; width:16px; height:16px; border-radius:50%;
+    background:var(--fat); color:#fff; font-size:10px; display:flex; align-items:center; justify-content:center;
+  }
+
+  /* ---------- match pairs ---------- */
+  .match-pair-check{ width:17px; height:17px; accent-color:var(--protein); flex-shrink:0; cursor:pointer; }
+  .match-empty{ text-align:center; color:var(--ink-soft); font-size:13.5px; padding:40px 0; }
+  .match-group{ border:1.5px solid var(--line); border-radius:12px; overflow:hidden; flex-shrink:0; }
+  .match-group-dish{
+    display:flex; align-items:center; gap:10px;
+    padding:11px 14px; background:var(--bg); border-bottom:1px solid var(--line);
+  }
+  .match-group-dish img{ width:60px; height:45px; object-fit:cover; border-radius:7px; flex-shrink:0; }
+  .match-group-dish .gd-info .name{ font-size:13px; font-weight:700; }
+  .match-group-dish .gd-info .sub{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .match-group-dish .gd-count{ margin-left:auto; font-size:11px; color:var(--ink-soft); white-space:nowrap; }
+  .match-group-customs{ padding:6px 14px 10px; display:flex; flex-direction:column; }
+  .match-custom-row{
+    display:flex; align-items:center; gap:10px;
+    padding:9px 0; cursor:pointer;
+  }
+  .match-custom-row + .match-custom-row{ border-top:1px solid var(--line); }
+  .match-custom-row.selected .mc-label{ color:var(--protein); }
+  .match-custom-row img{ width:48px; height:36px; object-fit:cover; border-radius:6px; flex-shrink:0; }
+  .mc-label{ flex:1; min-width:0; }
+  .mc-label .name{ font-size:13px; font-weight:600; }
+  .mc-label .sub{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+
+  /* ---------- auth gate ---------- */
+  .authgate{
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    padding:20px;
+  }
+  .authcard{
+    background:var(--paper); border-radius:18px; max-width:380px; width:100%;
+    padding:38px 32px; text-align:center; box-shadow:var(--shadow);
+  }
+  .authcard h1{ font-size:22px; margin:14px 0 8px; }
+  .authcard p{ color:var(--ink-soft); font-size:13.5px; line-height:1.6; margin:0 0 24px; }
+  .googlebtn{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; padding:11px 16px; border-radius:9px;
+    border:1px solid var(--line); background:var(--paper); color:var(--ink);
+    font-family:'IBM Plex Sans Thai', sans-serif; font-size:14px; font-weight:500; cursor:pointer;
+  }
+  .googlebtn:hover{ background:var(--bg); }
+  .domain-hint{ margin-top:18px; font-family:'IBM Plex Sans Thai', sans-serif; font-size:12px; color:var(--ink-soft); }
+  .auth-error{ color:var(--fat); font-size:12.5px; margin-top:14px; }
+  .userpill{
+    display:flex; align-items:center; gap:8px; margin-left:auto;
+    font-family:'IBM Plex Sans Thai', sans-serif; font-size:12.5px; color:var(--ink-soft);
+  }
+  .userpill button{
+    border:none; background:none; color:var(--ink-soft); text-decoration:underline;
+    cursor:pointer; font-family:'IBM Plex Sans Thai', sans-serif; font-size:12.5px; padding:0;
+  }
+</style>
+</head>
+<body>
+
+<div class="authgate" id="authGate">
+  <div class="authcard">
+    <div style="font-size:30px">🔒</div>
+    <h1>Bestfitt Compare</h1>
+    <p>กรอกอีเมลบริษัทเพื่อเข้าใช้งาน<br>อนุญาตเฉพาะอีเมลโดเมน <b>@muze.co.th</b></p>
+    <input type="email" id="emailInput" placeholder="ชื่อ@muze.co.th" style="width:100%;padding:10px 14px;border:1px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;margin-bottom:12px;outline:none;" />
+    <button class="googlebtn" id="loginBtn" style="width:100%;justify-content:center;">
+      เข้าสู่ระบบ
+    </button>
+    <div class="auth-error" id="authError"></div>
+    <div class="domain-hint">ระบบไม่เก็บรหัสผ่าน — ใช้อีเมลเพื่อระบุตัวตนเท่านั้น</div>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none">
+<header>
+  <div class="titlewrap">
+    <h1>Bestfitt Compare</h1>
+    <span class="eyebrow">เปรียบเทียบโภชนาการ</span>
+    <span class="userpill" id="userPill"></span>
+  </div>
+  <div class="sourcebar">
+    <input type="text" id="sheetUrlInput" placeholder="วางลิงก์ Google Sheets ที่ Publish to web เป็น CSV">
+    <button class="btn" id="connectSheetBtn">เชื่อมต่อ</button>
+    <span class="orsep">หรือ</span>
+    <button class="btn secondary" id="pickFileBtn2">อัปโหลดไฟล์ CSV</button>
+    <input type="file" id="fileInput" accept=".csv" style="display:none">
+    <span class="filename" id="sourceStatus"></span>
+  </div>
+  <details class="howto">
+    <summary>วิธีได้ลิงก์ Google Sheets (CSV)</summary>
+    <ol>
+      <li>เปิดไฟล์ <code>dish_clean_readable.csv</code> ใน Drive ด้วย Google Sheets (คลิกขวา → เปิดด้วย → Google Sheets)</li>
+      <li>ไปที่ File → Share → Publish to web</li>
+      <li>เลือกชีตที่มีข้อมูล แล้วเปลี่ยนรูปแบบเป็น Comma-separated values (.csv)</li>
+      <li>กด Publish แล้วคัดลอกลิงก์มาวางช่องด้านบน</li>
+    </ol>
+  </details>
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="ค้นหาส่วนผสมหรือเลขจาน เช่น chicken, 1561662216" style="width:260px">
+    <div class="numrange">
+      <label class="field-label">แคลอรี่</label>
+      <input type="number" id="kcalMin" placeholder="ต่ำสุด">
+      <span>–</span>
+      <input type="number" id="kcalMax" placeholder="สูงสุด">
+    </div>
+    <select id="sortSel">
+      <option value="default">เรียงตามไฟล์</option>
+      <option value="kcal-asc">แคลอรี่ น้อย → มาก</option>
+      <option value="kcal-desc">แคลอรี่ มาก → น้อย</option>
+      <option value="protein-desc">โปรตีนสูงสุดก่อน</option>
+      <option value="fat-asc">ไขมันน้อยที่สุดก่อน</option>
+    </select>
+    <div class="view-toggle">
+      <button id="viewExplorerBtn" class="active" type="button">Explorer</button>
+      <button id="viewGalleryBtn" type="button">Gallery</button>
+    </div>
+    <button class="btn secondary" id="addCustomBtn" type="button">+ เพิ่มข้อมูลเปรียบเทียบ</button>
+    <button class="btn secondary" id="openSavedSetsBtn" type="button">ชุดที่บันทึกไว้</button>
+    <button class="btn secondary" id="openCustomLibraryBtn" type="button">ข้อมูลที่เพิ่มเอง</button>
+  </div>
+  <div class="stats" id="statsLine"></div>
+</header>
+
+<main>
+  <div class="dropzone" id="dropzone">
+    <div class="icon">🍽️</div>
+    <h2 style="font-family:'IBM Plex Sans Thai',sans-serif; font-weight:700; margin:6px 0;">ยังไม่มีข้อมูล</h2>
+    <p>เชื่อมต่อ Google Sheets ที่ช่องด้านบนของหน้านี้<br>หรือเลือกไฟล์ <code>dish_clean_readable.csv</code> จากเครื่องเพื่อเริ่มต้น</p>
+    <button class="btn" id="pickFileBtn">เลือกไฟล์ CSV</button>
+  </div>
+
+  <div class="grid" id="grid"></div>
+  <div class="empty-filtered" id="emptyFiltered" style="display:none">ไม่มีจานที่ตรงกับเงื่อนไขนี้ ลองขยายช่วงแคลอรี่ หรือล้างคำค้นหาดูครับ</div>
+  <div class="loadmore-wrap" id="loadMoreWrap" style="display:none">
+    <button class="btn secondary" id="loadMoreBtn">โหลดเพิ่ม</button>
+  </div>
+</main>
+
+<div class="gallery-view" id="galleryView" style="display:none;">
+  <div class="gallery-grid" id="galleryGrid"></div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal" id="modalCard"></div>
+</div>
+
+<div class="comparebar" id="compareBar">
+  <span class="count" id="compareCount"></span>
+  <div class="thumbs" id="compareThumbs"></div>
+  <button class="btn secondary" id="compareClearBtn">ล้างทั้งหมด</button>
+  <button class="btn secondary" id="compareSaveBtn">บันทึกชุดนี้</button>
+  <button class="btn" id="compareOpenBtn">เปรียบเทียบ</button>
+</div>
+
+<div class="modal-bg" id="compareModalBg">
+  <div class="modal compare-modal" id="compareModalCard"></div>
+</div>
+
+<div class="modal-bg" id="customModalBg">
+  <div class="modal" id="customModalCard" style="max-width:480px;">
+    <div class="modal-body">
+      <div class="modal-top">
+        <div class="modal-id">เพิ่มข้อมูลเปรียบเทียบ (ไม่ใช่จาก CSV)</div>
+        <button class="closebtn" id="closeCustomModalBtn">✕</button>
+      </div>
+      <div id="cfContextNote" style="display:none; font-size:12.5px; color:var(--ink-soft); margin-top:6px;"></div>
+      <div class="customform">
+        <label class="formfield">ชื่อ/ป้ายกำกับ
+          <input type="text" id="cfName" placeholder="เช่น เมนูคู่แข่ง A">
+        </label>
+        <div class="formrow">
+          <label class="formfield">แคลอรี่ (kcal)<input type="number" id="cfKcal" placeholder="0"></label>
+          <label class="formfield">น้ำหนักรวม (g)<input type="number" id="cfMass" placeholder="0"></label>
+        </div>
+        <div class="formrow">
+          <label class="formfield">ไขมัน (g)<input type="number" id="cfFat" placeholder="0"></label>
+          <label class="formfield">คาร์บ (g)<input type="number" id="cfCarb" placeholder="0"></label>
+          <label class="formfield">โปรตีน (g)<input type="number" id="cfProtein" placeholder="0"></label>
+        </div>
+        <label class="formfield">ส่วนผสม/หมายเหตุ (ถ้ามี)
+          <input type="text" id="cfIngr" placeholder="คั่นด้วย , เช่น ข้าวกล้อง, อกไก่">
+        </label>
+        <label class="formfield">อัปโหลดรูป
+          <input type="file" id="cfImageFile" accept="image/*">
+        </label>
+        <label class="formfield">หรือวาง URL รูปภาพ
+          <input type="text" id="cfImageUrl" placeholder="https://...">
+        </label>
+        <div id="cfPreviewWrap" style="display:none;">
+          <img id="cfPreview" style="width:120px; height:90px; object-fit:cover; border-radius:8px;">
+        </div>
+      </div>
+      <div class="compare-actions" style="margin-top:18px;">
+        <button class="btn" id="cfSaveBtn" type="button">บันทึกและเพิ่มเข้าเปรียบเทียบ</button>
+        <button class="btn secondary" id="cfCancelBtn" type="button">ยกเลิก</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="saveNameModalBg">
+  <div class="modal" id="saveNameModalCard" style="max-width:380px;">
+    <div class="modal-body">
+      <div class="modal-top">
+        <div class="modal-id">บันทึกชุดเปรียบเทียบ</div>
+        <button class="closebtn" id="closeSaveNameModalBtn">✕</button>
+      </div>
+      <label class="formfield" style="margin-top:14px;">ชื่อชุดข้อมูล
+        <input type="text" id="saveNameInput" placeholder="เช่น เปรียบเทียบเมนูคลีนสัปดาห์นี้">
+      </label>
+      <div class="compare-actions" style="margin-top:16px;">
+        <button class="btn" id="saveNameConfirmBtn" type="button">บันทึก</button>
+        <button class="btn secondary" id="saveNameCancelBtn" type="button">ยกเลิก</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="savedSetsModalBg">
+  <div class="modal" id="savedSetsModalCard" style="max-width:560px;">
+    <div class="modal-body">
+      <div class="modal-top">
+        <div class="modal-id">ชุดเปรียบเทียบที่บันทึกไว้</div>
+        <button class="closebtn" id="closeSavedSetsModalBtn">✕</button>
+      </div>
+      <div id="savedSetsList" style="margin-top:14px; display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="customLibraryModalBg">
+  <div class="modal" id="customLibraryModalCard" style="max-width:600px; max-height:82vh; display:flex; flex-direction:column;">
+    <div class="modal-body" style="display:flex; flex-direction:column; flex:1; min-height:0;">
+      <div class="modal-top">
+        <div>
+          <div class="modal-id">ข้อมูลที่เพิ่มเอง (ไม่ใช่จาก CSV)</div>
+          <div style="font-size:12.5px; color:var(--ink-soft); margin-top:4px;">รายการที่กรอกไว้ผ่าน "เพิ่มข้อมูลเปรียบเทียบ" ทั้งหมด เก็บไว้ในเครื่องนี้</div>
+        </div>
+        <button class="closebtn" id="closeCustomLibraryModalBtn">✕</button>
+      </div>
+      <div id="customLibraryList" style="margin-top:14px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; flex:1;"></div>
+      <div class="compare-actions" style="margin-top:0; padding-top:14px; border-top:1px solid var(--line); flex-shrink:0;">
+        <button class="btn" id="libraryAddNewBtn" type="button">+ เพิ่มข้อมูลใหม่</button>
+        <button class="btn secondary" id="libraryAutoMatchBtn" type="button">จับคู่อัตโนมัติทั้งหมด</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="matchPairsModalBg">
+  <div class="modal" id="matchPairsModalCard" style="max-width:680px;">
+    <div class="modal-body">
+      <div class="modal-top">
+        <div>
+          <div class="modal-id">คู่ที่จับคู่ได้อัตโนมัติ</div>
+          <div style="font-size:12.5px; color:var(--ink-soft); margin-top:3px;">เลือกคู่ที่ต้องการเพิ่มเข้าเปรียบเทียบ</div>
+        </div>
+        <button class="closebtn" id="closeMatchPairsModalBtn">✕</button>
+      </div>
+      <div id="matchPairsList" style="margin-top:16px; display:flex; flex-direction:column; gap:10px; max-height:55vh; overflow-y:auto;"></div>
+      <div class="compare-actions" style="margin-top:16px;">
+        <button class="btn" id="matchPairsConfirmBtn" type="button">เพิ่มที่เลือกเข้าเปรียบเทียบ</button>
+        <button class="btn" id="matchPairsCompareNowBtn" type="button" style="background:var(--protein); border-color:var(--protein);">เปรียบเทียบเลย</button>
+        <button class="btn secondary" id="matchPairsSelectAllBtn" type="button">เลือกทั้งหมด</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /#appRoot -->
+
+<script>
+let ALL_DISHES = [];
+let CURRENT_USER_NAME = '';
+let FILTERED = [];
+let PAGE_SIZE = 48;
+let shown = 0;
+const COMPARE = new Set();
+const COMPARE_MAX = 6;
+const CUSTOM_KEY = 'n5k_custom_dishes';
+function loadCustomDishesFromStorage(){
+  try { return JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]'); } catch(e){ return []; }
+}
+function persistCustomDishes(){
+  try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(CUSTOM_DISHES)); } catch(e){}
+  syncCustomDishesToAPI();
+}
+async function syncCustomDishesToAPI(){
+  try {
+    await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dishes: CUSTOM_DISHES.map(d => ({
+        ...d,
+        image: d.image && d.image.startsWith('data:') ? '' : (d.image || '')
+      })) })
+    });
+  } catch(e){ console.warn('Sync to API failed', e); }
+}
+async function initCustomDishesFromAPI(){
+  try {
+    const res = await fetch(GAS_URL);
+    if(res.ok){
+      const data = await res.json();
+      if(Array.isArray(data) && data.length > 0){
+        CUSTOM_DISHES = data;
+        try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(CUSTOM_DISHES)); } catch(e){}
+        return;
+      }
+      // API ว่างอยู่ — ลอง migrate จาก localStorage
+      const local = loadCustomDishesFromStorage();
+      if(local.length > 0){
+        CUSTOM_DISHES = local;
+        syncCustomDishesToAPI(); // push ขึ้น Google Sheets
+        return;
+      }
+    }
+  } catch(e){ console.warn('API load failed, using localStorage', e); }
+  CUSTOM_DISHES = loadCustomDishesFromStorage();
+}
+let CUSTOM_DISHES = loadCustomDishesFromStorage();
+let editingCustomId = null;
+
+function findDish(id){
+  return ALL_DISHES.find(x => x.id === id) || CUSTOM_DISHES.find(x => x.id === id);
+}
+function dishLabel(d){
+  return d.label ? d.label : `No. ${d.id.replace('dish_','')}`;
+}
+
+const grid = document.getElementById('grid');
+const statsLine = document.getElementById('statsLine');
+const dropzone = document.getElementById('dropzone');
+const emptyFiltered = document.getElementById('emptyFiltered');
+const loadMoreWrap = document.getElementById('loadMoreWrap');
+const fileInput = document.getElementById('fileInput');
+
+function pick(row, candidates, fallback){
+  for(const c of candidates){
+    if(row[c] !== undefined && row[c] !== null && String(row[c]).trim() !== '') return row[c];
+  }
+  return fallback;
+}
+function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+function normalizeRows(rows){
+  return rows.map(r => ({
+    id: pick(r, ['dish_id'], ''),
+    image: pick(r, ['image_url'], ''),
+    kcal: num(pick(r, ['calories','total_calories'], 0)),
+    mass: num(pick(r, ['mass_g','total_mass'], 0)),
+    fat: num(pick(r, ['fat_g','total_fat'], 0)),
+    carb: num(pick(r, ['carb_g','total_carb'], 0)),
+    protein: num(pick(r, ['protein_g','total_protein'], 0)),
+    ingrText: String(pick(r, ['ingredients','ingredients_summary'], '')).replace(/\|/g, ' · ')
+  })).filter(d => d.id && d.image);
+}
+
+document.getElementById('pickFileBtn').onclick = () => fileInput.click();
+document.getElementById('pickFileBtn2').onclick = () => fileInput.click();
+fileInput.onchange = e => { if(e.target.files[0]) loadFile(e.target.files[0]); };
+
+document.getElementById('connectSheetBtn').onclick = () => {
+  const url = document.getElementById('sheetUrlInput').value.trim();
+  if(url) loadFromSheet(url);
+};
+document.getElementById('sheetUrlInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter') document.getElementById('connectSheetBtn').click();
+});
+
+['dragover','dragleave','drop'].forEach(evt => {
+  dropzone.addEventListener(evt, e => { e.preventDefault(); });
+});
+dropzone.addEventListener('dragover', () => dropzone.classList.add('dragover'));
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  dropzone.classList.remove('dragover');
+  if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+
+const DISHES_SNAPSHOT_KEY = 'n5k_dishes_snapshot';
+function persistDishesSnapshot(){
+  try { localStorage.setItem(DISHES_SNAPSHOT_KEY, JSON.stringify(ALL_DISHES)); } catch(e){ console.error('Persist dishes failed', e); }
+}
+function loadDishesSnapshot(){
+  try { return JSON.parse(localStorage.getItem(DISHES_SNAPSHOT_KEY) || 'null'); } catch(e){ return null; }
+}
+
+function loadFile(file){
+  Papa.parse(file, {
+    header:true,
+    skipEmptyLines:true,
+    complete: res => {
+      ALL_DISHES = normalizeRows(res.data);
+      persistDishesSnapshot();
+      document.getElementById('sourceStatus').textContent = `ไฟล์: ${file.name}`;
+      clearSheetError();
+      dropzone.style.display = 'none';
+      applyFilters();
+    }
+  });
+}
+
+function loadFromSheet(url){
+  document.getElementById('sourceStatus').textContent = 'กำลังโหลด...';
+  Papa.parse(url, {
+    download:true,
+    header:true,
+    skipEmptyLines:true,
+    complete: res => {
+      const rows = normalizeRows(res.data || []);
+      if(rows.length === 0){
+        document.getElementById('sourceStatus').textContent = '';
+        showSheetError('โหลดได้ แต่ไม่พบข้อมูลที่ใช้ได้ — ตรวจสอบว่า publish ชีตที่มีคอลัมน์ dish_id และ image_url');
+        return;
+      }
+      ALL_DISHES = rows;
+      persistDishesSnapshot();
+      localStorage.setItem('n5k_sheet_url', url);
+      document.getElementById('sheetUrlInput').value = url;
+      document.getElementById('sourceStatus').textContent = 'เชื่อมต่อ Google Sheets แล้ว';
+      clearSheetError();
+      dropzone.style.display = 'none';
+      applyFilters();
+    },
+    error: () => {
+      document.getElementById('sourceStatus').textContent = '';
+      showSheetError('โหลดไม่สำเร็จ ตรวจสอบว่า Publish to web เป็น CSV แล้ว และลิงก์ถูกต้อง');
+    }
+  });
+}
+
+function showSheetError(msg){
+  let el = document.getElementById('sheetErrorMsg');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'sheetErrorMsg';
+    el.className = 'sheet-error';
+    document.querySelector('.howto').insertAdjacentElement('afterend', el);
+  }
+  el.textContent = msg;
+}
+function clearSheetError(){
+  const el = document.getElementById('sheetErrorMsg');
+  if(el) el.remove();
+}
+
+function fingerprintSegments(d, heightVar){
+  const total = d.fat + d.carb + d.protein;
+  if(total <= 0) return `<div style="background:var(--line); width:100%; ${heightVar}"></div>`;
+  const f = d.fat/total*100, c = d.carb/total*100, p = d.protein/total*100;
+  return `<div style="background:var(--fat); width:${f}%"></div>`
+       + `<div style="background:var(--carb); width:${c}%"></div>`
+       + `<div style="background:var(--protein); width:${p}%"></div>`;
+}
+
+function cardHTML(d){
+  const isSelected = COMPARE.has(d.id);
+  return `
+    <div class="card${isSelected ? ' compare-selected' : ''}" data-id="${d.id}" tabindex="0">
+      <div class="imgwrap">
+        <img src="${d.image}" loading="lazy" alt="จานอาหาร ${d.id}">
+        <span class="tag">No. ${d.id.replace('dish_','')}</span>
+        <span class="compare-toggle${isSelected ? ' active' : ''}" data-compare-id="${d.id}" title="เลือกเพื่อเปรียบเทียบ">${isSelected ? '✓' : '+'}</span>
+      </div>
+      <div class="fingerprint">${fingerprintSegments(d)}</div>
+      <div class="body">
+        <div class="kcalrow"><span class="kcal">${Math.round(d.kcal)}</span><span class="kcalunit">kcal</span></div>
+        <div class="macros">
+          <span>F <b>${d.fat.toFixed(1)}g</b></span>
+          <span>C <b>${d.carb.toFixed(1)}g</b></span>
+          <span>P <b>${d.protein.toFixed(1)}g</b></span>
+        </div>
+        <div class="ingr-preview">${d.ingrText || 'ไม่มีข้อมูลส่วนผสม'}</div>
+      </div>
+    </div>`;
+}
+
+function applyFilters(){
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const min = document.getElementById('kcalMin').value !== '' ? parseFloat(document.getElementById('kcalMin').value) : -Infinity;
+  const max = document.getElementById('kcalMax').value !== '' ? parseFloat(document.getElementById('kcalMax').value) : Infinity;
+  const sort = document.getElementById('sortSel').value;
+
+  FILTERED = ALL_DISHES.filter(d =>
+    d.kcal >= min && d.kcal <= max &&
+    (q === '' ||
+      d.ingrText.toLowerCase().includes(q) ||
+      d.id.toLowerCase().includes(q) ||
+      dishLabel(d).toLowerCase().includes(q))
+  );
+
+  if(sort === 'kcal-asc') FILTERED.sort((a,b) => a.kcal - b.kcal);
+  if(sort === 'kcal-desc') FILTERED.sort((a,b) => b.kcal - a.kcal);
+  if(sort === 'protein-desc') FILTERED.sort((a,b) => b.protein - a.protein);
+  if(sort === 'fat-asc') FILTERED.sort((a,b) => a.fat - b.fat);
+
+  shown = 0;
+  grid.innerHTML = '';
+  renderMore();
+  updateStats();
+}
+
+function renderMore(){
+  const next = FILTERED.slice(shown, shown + PAGE_SIZE);
+  grid.insertAdjacentHTML('beforeend', next.map(cardHTML).join(''));
+  shown += next.length;
+  emptyFiltered.style.display = FILTERED.length === 0 ? 'block' : 'none';
+  loadMoreWrap.style.display = shown < FILTERED.length ? 'block' : 'none';
+}
+
+function updateStats(){
+  if(ALL_DISHES.length === 0){ statsLine.textContent=''; return; }
+  const avg = FILTERED.length ? Math.round(FILTERED.reduce((s,d)=>s+d.kcal,0)/FILTERED.length) : 0;
+  statsLine.textContent = `แสดง ${FILTERED.length.toLocaleString()} จาน จากทั้งหมด ${ALL_DISHES.length.toLocaleString()} จาน · แคลอรี่เฉลี่ย ${avg} kcal`;
+}
+
+document.getElementById('search').addEventListener('input', applyFilters);
+document.getElementById('kcalMin').addEventListener('input', applyFilters);
+document.getElementById('kcalMax').addEventListener('input', applyFilters);
+document.getElementById('sortSel').addEventListener('change', applyFilters);
+document.getElementById('loadMoreBtn').addEventListener('click', renderMore);
+
+// ---------- modal ----------
+const modalBg = document.getElementById('modalBg');
+const modalCard = document.getElementById('modalCard');
+
+grid.addEventListener('click', e => {
+  const toggle = e.target.closest('.compare-toggle');
+  if(toggle){
+    toggleCompare(toggle.dataset.compareId, toggle);
+    return;
+  }
+  const card = e.target.closest('.card');
+  if(card) openModal(card.dataset.id);
+});
+grid.addEventListener('keydown', e => {
+  if(e.key === 'Enter'){
+    const card = e.target.closest('.card');
+    if(card) openModal(card.dataset.id);
+  }
+});
+
+function openModal(id){
+  const d = findDish(id);
+  if(!d) return;
+  const chips = d.ingrText.split(' · ').filter(Boolean).map(t => `<span class="chip">${t}</span>`).join('');
+  const titleLabel = d.isCustom ? d.label : `No. ${d.id.replace('dish_','')}`;
+  const addedByRow = d.addedBy ? `<div style="font-size:12px; color:var(--ink-soft); margin-top:6px;">เพิ่มโดย ${d.addedBy}</div>` : '';
+  const compareActions = d.isCustom ? '' : `
+      <div class="compare-actions" style="margin-top:18px;">
+        <button class="btn secondary" id="addCompareForThisBtn" type="button">+ เพิ่มข้อมูลเปรียบเทียบสำหรับจานนี้</button>
+      </div>`;
+  modalCard.innerHTML = `
+    <img class="modal-img" src="${d.image}" alt="${titleLabel}">
+    <div class="modal-body">
+      <div class="modal-top">
+        <div>
+          <div class="modal-id">${titleLabel}</div>
+          <div class="modal-kcal">${Math.round(d.kcal)} <span style="font-size:14px; font-family:'IBM Plex Sans Thai'; color:var(--ink-soft); font-weight:400">kcal</span></div>
+          ${addedByRow}
+        </div>
+        <button class="closebtn" id="closeModalBtn">✕</button>
+      </div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--fat)"></span>ไขมัน</span>
+        <span><span class="dot" style="background:var(--carb)"></span>คาร์บ</span>
+        <span><span class="dot" style="background:var(--protein)"></span>โปรตีน</span>
+      </div>
+      <div class="modal-fingerprint">${fingerprintSegments(d)}</div>
+      <div class="macrogrid">
+        <div class="cell"><div class="v">${d.mass.toFixed(0)}g</div><div class="l">น้ำหนักรวม</div></div>
+        <div class="cell"><div class="v">${d.fat.toFixed(1)}g</div><div class="l">ไขมัน</div></div>
+        <div class="cell"><div class="v">${d.carb.toFixed(1)}g</div><div class="l">คาร์บ</div></div>
+        <div class="cell"><div class="v">${d.protein.toFixed(1)}g</div><div class="l">โปรตีน</div></div>
+      </div>
+      <div class="ingr-title">ส่วนผสม</div>
+      <div class="chips">${chips || '<span style="color:var(--ink-soft); font-size:13px">ไม่มีข้อมูล</span>'}</div>
+      ${compareActions}
+    </div>`;
+  modalBg.classList.add('open');
+  document.getElementById('closeModalBtn').onclick = closeModal;
+  if(!d.isCustom){
+    document.getElementById('addCompareForThisBtn').onclick = () => {
+      closeModal();
+      openCustomFormFor(d);
+    };
+  }
+}
+function closeModal(){ modalBg.classList.remove('open'); }
+modalBg.addEventListener('click', e => { if(e.target === modalBg) closeModal(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeModal(); closeCompareModal(); closeCustomModal(); closeSaveNameModal(); closeSavedSetsModal(); closeCustomLibraryModal(); } });
+
+// ---------- compare ----------
+const compareBar = document.getElementById('compareBar');
+const compareModalBg = document.getElementById('compareModalBg');
+const compareModalCard = document.getElementById('compareModalCard');
+
+function toggleCompare(id, toggleEl){
+  const card = toggleEl.closest('.card');
+  if(COMPARE.has(id)){
+    COMPARE.delete(id);
+    toggleEl.classList.remove('active');
+    toggleEl.textContent = '+';
+    if(card) card.classList.remove('compare-selected');
+  } else {
+    if(COMPARE.size >= COMPARE_MAX){
+      updateCompareBar(`เลือกได้สูงสุด ${COMPARE_MAX} จาน — เอาอันใดอันหนึ่งออกก่อนนะครับ`);
+      return;
+    }
+    COMPARE.add(id);
+    toggleEl.classList.add('active');
+    toggleEl.textContent = '✓';
+    if(card) card.classList.add('compare-selected');
+  }
+  updateCompareBar();
+}
+
+function updateCompareBar(flashMsg){
+  const ids = Array.from(COMPARE);
+  if(ids.length === 0){ compareBar.classList.remove('show'); return; }
+  compareBar.classList.add('show');
+  document.getElementById('compareCount').textContent = flashMsg || `เลือกแล้ว ${ids.length} จาน`;
+  const thumbs = document.getElementById('compareThumbs');
+  thumbs.innerHTML = ids.map(id => {
+    const d = findDish(id);
+    if(!d) return '';
+    return `<span class="compare-thumb-wrap" data-remove-id="${id}" title="คลิกเพื่อเอาออกจากการเปรียบเทียบ">
+      <img src="${d.image}" alt="${dishLabel(d)}">
+      <span class="x">✕</span>
+    </span>`;
+  }).join('');
+  thumbs.querySelectorAll('.compare-thumb-wrap').forEach(el => {
+    el.addEventListener('click', () => removeFromCompare(el.dataset.removeId));
+  });
+}
+
+function removeFromCompare(id){
+  COMPARE.delete(id);
+  const toggleEl = document.querySelector(`.compare-toggle[data-compare-id="${id}"]`);
+  if(toggleEl){
+    toggleEl.classList.remove('active');
+    toggleEl.textContent = '+';
+    const card = toggleEl.closest('.card');
+    if(card) card.classList.remove('compare-selected');
+  }
+  updateCompareBar();
+}
+
+document.getElementById('compareClearBtn').addEventListener('click', () => {
+  COMPARE.clear();
+  document.querySelectorAll('.compare-toggle.active').forEach(el => { el.classList.remove('active'); el.textContent = '+'; });
+  document.querySelectorAll('.card.compare-selected').forEach(el => el.classList.remove('compare-selected'));
+  updateCompareBar();
+});
+
+document.getElementById('compareOpenBtn').addEventListener('click', openCompareModal);
+
+const COMPARE_METRICS = [
+  { key: 'kcal',    label: 'แคลอรี่ (kcal)', fmt: v => Math.round(v), better: 'min' },
+  { key: 'mass',    label: 'น้ำหนักรวม (g)', fmt: v => v.toFixed(0) },
+  { key: 'fat',     label: 'ไขมัน (g)',     fmt: v => v.toFixed(1), better: 'min' },
+  { key: 'carb',    label: 'คาร์บ (g)',     fmt: v => v.toFixed(1), better: 'min' },
+  { key: 'protein', label: 'โปรตีน (g)',    fmt: v => v.toFixed(1), better: 'max' },
+];
+
+function openCompareModal(){
+  const dishes = Array.from(COMPARE).map(id => findDish(id)).filter(Boolean);
+  if(dishes.length === 0) return;
+
+  const headerRow = `
+    <tr>
+      <th class="rowlabel"></th>
+      ${dishes.map(d => `
+        <th class="dishcol">
+          <img class="thumb" src="${d.image}" alt="${dishLabel(d)}">
+          <span class="dishid">${dishLabel(d)}</span>
+        </th>`).join('')}
+    </tr>`;
+
+  const metricRows = COMPARE_METRICS.map(m => {
+    const values = dishes.map(d => d[m.key]);
+    let bestVal = null;
+    if(m.better === 'min') bestVal = Math.min(...values);
+    if(m.better === 'max') bestVal = Math.max(...values);
+    return `
+      <tr>
+        <td class="rowlabel">${m.label}</td>
+        ${dishes.map(d => {
+          const v = d[m.key];
+          const isBest = bestVal !== null && v === bestVal;
+          let pctHtml = '';
+          if(bestVal !== null && bestVal !== 0){
+            if(isBest){
+              pctHtml = `<div class="compare-pct best">ดีที่สุด</div>`;
+            } else {
+              const pct = (v - bestVal) / bestVal * 100;
+              const sign = pct >= 0 ? '+' : '';
+              pctHtml = `<div class="compare-pct worse">${sign}${pct.toFixed(1)}%</div>`;
+            }
+          }
+          return `<td class="dishcol${isBest ? ' best' : ''}">${m.fmt(v)}${pctHtml}</td>`;
+        }).join('')}
+      </tr>`;
+  }).join('');
+
+  const ingrRow = `
+    <tr>
+      <td class="rowlabel">ส่วนผสม</td>
+      ${dishes.map(d => `<td style="font-size:12px; color:var(--ink-soft)">${d.ingrText || '—'}</td>`).join('')}
+    </tr>`;
+
+  const hasAddedBy = dishes.some(d => d.addedBy);
+  const addedByRow = hasAddedBy ? `
+    <tr>
+      <td class="rowlabel">เพิ่มโดย</td>
+      ${dishes.map(d => `<td style="font-size:12px; color:var(--ink-soft)">${d.addedBy || '—'}</td>`).join('')}
+    </tr>` : '';
+
+  compareModalCard.innerHTML = `
+    <div class="modal-body">
+      <div class="modal-top">
+        <div>
+          <div class="modal-id">เปรียบเทียบ ${dishes.length} จาน</div>
+          <div class="modal-kcal" style="font-size:22px">Compare</div>
+        </div>
+        <button class="closebtn" id="closeCompareModalBtn">✕</button>
+      </div>
+      <div class="compare-legend"><span class="dot" style="display:inline-block; vertical-align:middle; margin-right:6px;"></span>ช่องสีเขียว = ค่าที่ดีที่สุดในกลุ่มที่เลือก (แคลอรี่/ไขมัน/คาร์บน้อยที่สุด, โปรตีนมากที่สุด)</div>
+      <div class="comparetable-wrap">
+        <table class="comparetable">
+          <thead>${headerRow}</thead>
+          <tbody>${metricRows}${ingrRow}${addedByRow}</tbody>
+        </table>
+      </div>
+      <div class="compare-actions">
+        <button class="btn" id="compareExportCsvBtn">ดาวน์โหลด CSV</button>
+        <button class="btn secondary" id="compareOpenSheetBtn">เปิด Google Sheets ใหม่</button>
+      </div>
+    </div>`;
+
+  compareModalBg.classList.add('open');
+  document.getElementById('closeCompareModalBtn').onclick = closeCompareModal;
+  document.getElementById('compareExportCsvBtn').onclick = () => exportCompareCSV(dishes);
+  document.getElementById('compareOpenSheetBtn').onclick = () => window.open('https://sheets.new', '_blank');
+}
+
+function closeCompareModal(){ compareModalBg.classList.remove('open'); }
+compareModalBg.addEventListener('click', e => { if(e.target === compareModalBg) closeCompareModal(); });
+
+function csvCell(value){
+  const s = String(value ?? '');
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function exportCompareCSV(dishes){
+  const rows = [];
+  rows.push(['', ...dishes.map(d => dishLabel(d))]);
+  rows.push(['ลิงก์รูป', ...dishes.map(d => d.image)]);
+  COMPARE_METRICS.forEach(m => {
+    rows.push([m.label, ...dishes.map(d => m.fmt(d[m.key]))]);
+    if(m.better){
+      const values = dishes.map(d => d[m.key]);
+      const bestVal = m.better === 'min' ? Math.min(...values) : Math.max(...values);
+      rows.push([`${m.label} (%)`, ...dishes.map(d => {
+        const v = d[m.key];
+        if(v === bestVal) return 'ดีที่สุด';
+        if(bestVal === 0) return '-';
+        const pct = (v - bestVal) / bestVal * 100;
+        return (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+      })]);
+    }
+  });
+  rows.push(['ส่วนผสม', ...dishes.map(d => d.ingrText || '')]);
+  if(dishes.some(d => d.addedBy)){
+    rows.push(['เพิ่มโดย', ...dishes.map(d => d.addedBy || '')]);
+  }
+
+  const csv = rows.map(r => r.map(csvCell).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `nutrition5k_compare_${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ---------- custom (non-CSV) comparison entries ----------
+const PLACEHOLDER_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect width="100%" height="100%" fill="%23DCE3D5"/></svg>'
+);
+
+const customModalBg = document.getElementById('customModalBg');
+let cfImageDataUrl = '';
+
+document.getElementById('addCustomBtn').addEventListener('click', () => openCustomFormFor(null));
+document.getElementById('closeCustomModalBtn').addEventListener('click', closeCustomModal);
+document.getElementById('cfCancelBtn').addEventListener('click', closeCustomModal);
+customModalBg.addEventListener('click', e => { if(e.target === customModalBg) closeCustomModal(); });
+
+function closeCustomModal(){ customModalBg.classList.remove('open'); }
+
+function openCustomFormFor(dish){
+  resetCustomForm();
+  const note = document.getElementById('cfContextNote');
+  if(dish){
+    document.getElementById('cfImageUrl').value = dish.image;
+    document.getElementById('cfPreview').src = dish.image;
+    document.getElementById('cfPreviewWrap').style.display = 'block';
+    note.textContent = `กำลังเพิ่มข้อมูลเปรียบเทียบสำหรับ ${dishLabel(dish)} — ใช้รูปเดียวกับจานนี้ให้อัตโนมัติ (อัปโหลดรูปใหม่แทนได้ถ้าต้องการ)`;
+    note.style.display = 'block';
+    if(!COMPARE.has(dish.id) && COMPARE.size < COMPARE_MAX){
+      COMPARE.add(dish.id);
+      updateCompareBar();
+    }
+  } else {
+    note.style.display = 'none';
+  }
+  customModalBg.classList.add('open');
+}
+
+function openCustomFormEdit(dish){
+  resetCustomForm();
+  editingCustomId = dish.id;
+  document.getElementById('cfName').value = dish.label || '';
+  document.getElementById('cfKcal').value = dish.kcal || '';
+  document.getElementById('cfMass').value = dish.mass || '';
+  document.getElementById('cfFat').value = dish.fat || '';
+  document.getElementById('cfCarb').value = dish.carb || '';
+  document.getElementById('cfProtein').value = dish.protein || '';
+  document.getElementById('cfIngr').value = dish.ingrText || '';
+  if(dish.image && dish.image !== PLACEHOLDER_IMG){
+    if(dish.image.startsWith('data:')){
+      cfImageDataUrl = dish.image;
+    } else {
+      document.getElementById('cfImageUrl').value = dish.image;
+    }
+    document.getElementById('cfPreview').src = dish.image;
+    document.getElementById('cfPreviewWrap').style.display = 'block';
+  }
+  const note = document.getElementById('cfContextNote');
+  note.textContent = 'กำลังแก้ไข — กด "บันทึกการแก้ไข" เพื่อบันทึก';
+  note.style.display = 'block';
+  document.getElementById('cfSaveBtn').textContent = 'บันทึกการแก้ไข';
+  customModalBg.classList.add('open');
+}
+
+function resetCustomForm(){
+  ['cfName','cfKcal','cfMass','cfFat','cfCarb','cfProtein','cfIngr','cfImageUrl'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('cfImageFile').value = '';
+  cfImageDataUrl = '';
+  document.getElementById('cfPreviewWrap').style.display = 'none';
+  document.getElementById('cfContextNote').style.display = 'none';
+  editingCustomId = null;
+  document.getElementById('cfSaveBtn').textContent = 'บันทึกและเพิ่มเข้าเปรียบเทียบ';
+}
+
+
+document.getElementById('cfImageFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    cfImageDataUrl = reader.result;
+    document.getElementById('cfPreview').src = cfImageDataUrl;
+    document.getElementById('cfPreviewWrap').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('cfSaveBtn').addEventListener('click', () => {
+  const name = document.getElementById('cfName').value.trim();
+  if(!name){
+    document.getElementById('cfName').focus();
+    return;
+  }
+  const num = id => Number(document.getElementById(id).value) || 0;
+  const imageUrl = document.getElementById('cfImageUrl').value.trim();
+
+  // edit mode
+  if(editingCustomId){
+    const idx = CUSTOM_DISHES.findIndex(d => d.id === editingCustomId);
+    if(idx !== -1){
+      CUSTOM_DISHES[idx] = {
+        ...CUSTOM_DISHES[idx],
+        label: name,
+        kcal: num('cfKcal'), mass: num('cfMass'),
+        fat: num('cfFat'), carb: num('cfCarb'), protein: num('cfProtein'),
+        ingrText: document.getElementById('cfIngr').value.trim(),
+        image: cfImageDataUrl || imageUrl || CUSTOM_DISHES[idx].image,
+      };
+      persistCustomDishes();
+    }
+    closeCustomModal();
+    return;
+  }
+
+  const id = 'custom_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+
+  const dish = {
+    id,
+    label: name,
+    kcal: num('cfKcal'),
+    mass: num('cfMass'),
+    fat: num('cfFat'),
+    carb: num('cfCarb'),
+    protein: num('cfProtein'),
+    ingrText: document.getElementById('cfIngr').value.trim(),
+    image: cfImageDataUrl || imageUrl || PLACEHOLDER_IMG,
+    isCustom: true,
+    addedBy: CURRENT_USER_NAME || ''
+  };
+
+  CUSTOM_DISHES.push(dish);
+  persistCustomDishes();
+
+  // auto-match: ดึงตัวเลขจากชื่อ แล้วหา dish ที่ ID ตรงกัน
+  const nums = dish.label.match(/\d{5,}/g) || [];
+  const matched = nums.reduce((found, n) =>
+    found || ALL_DISHES.find(d => d.id.replace('dish_','') === n || d.id === n), null);
+
+  const toAdd = [id];
+  if(matched && !COMPARE.has(matched.id)) toAdd.push(matched.id);
+
+  const overflow = COMPARE.size + toAdd.length > COMPARE_MAX;
+  if(overflow){
+    updateCompareBar(`เลือกได้สูงสุด ${COMPARE_MAX} จาน — เอาอันใดอันหนึ่งออกก่อนนะครับ`);
+  } else {
+    toAdd.forEach(addId => COMPARE.add(addId));
+    updateCompareBar(matched
+      ? `จับคู่กับ No. ${matched.id.replace('dish_','')} อัตโนมัติแล้ว`
+      : null);
+    if(matched) setTimeout(() => updateCompareBar(), 2500);
+  }
+  closeCustomModal();
+});
+
+// ---------- custom data library page ----------
+const customLibraryModalBg = document.getElementById('customLibraryModalBg');
+const customLibraryList = document.getElementById('customLibraryList');
+
+function closeCustomLibraryModal(){ customLibraryModalBg.classList.remove('open'); }
+document.getElementById('closeCustomLibraryModalBtn').addEventListener('click', closeCustomLibraryModal);
+customLibraryModalBg.addEventListener('click', e => { if(e.target === customLibraryModalBg) closeCustomLibraryModal(); });
+
+document.getElementById('openCustomLibraryBtn').addEventListener('click', () => {
+  renderCustomLibraryList();
+  customLibraryModalBg.classList.add('open');
+});
+document.getElementById('libraryAddNewBtn').addEventListener('click', () => {
+  closeCustomLibraryModal();
+  openCustomFormFor(null);
+});
+
+document.getElementById('libraryAutoMatchBtn').addEventListener('click', () => {
+  if(ALL_DISHES.length === 0){
+    alert('ยังไม่มีข้อมูลหลัก — โหลด CSV ก่อนนะครับ');
+    return;
+  }
+  closeCustomLibraryModal();
+  openMatchPairsModal();
+});
+
+// ---------- match pairs modal ----------
+const matchPairsModalBg = document.getElementById('matchPairsModalBg');
+
+function findAllMatches(){
+  const groups = new Map(); // dishId → { dish, customs[] }
+  CUSTOM_DISHES.forEach(c => {
+    const nums = c.label.match(/\d{5,}/g) || [];
+    const matched = nums.reduce((found, n) =>
+      found || ALL_DISHES.find(d => d.id.replace('dish_','') === n || d.id === n), null);
+    if(!matched) return;
+    if(!groups.has(matched.id)) groups.set(matched.id, { dish: matched, customs: [] });
+    groups.get(matched.id).customs.push(c);
+  });
+  return Array.from(groups.values());
+}
+
+function openMatchPairsModal(){
+  renderMatchPairsList();
+  matchPairsModalBg.classList.add('open');
+}
+function closeMatchPairsModal(){ matchPairsModalBg.classList.remove('open'); }
+
+document.getElementById('closeMatchPairsModalBtn').addEventListener('click', closeMatchPairsModal);
+matchPairsModalBg.addEventListener('click', e => { if(e.target === matchPairsModalBg) closeMatchPairsModal(); });
+
+function renderMatchPairsList(){
+  const groups = findAllMatches();
+  const list = document.getElementById('matchPairsList');
+  if(groups.length === 0){
+    list.innerHTML = '<div class="match-empty">ไม่พบคู่ที่ตรงกัน — ตรวจสอบว่าชื่อข้อมูลมีเลข ID ของจานอยู่ด้วยครับ</div>';
+    return;
+  }
+  list.innerHTML = groups.map((g, gi) => `
+    <div class="match-group">
+      <div class="match-group-dish">
+        <img src="${g.dish.image}" alt="No. ${g.dish.id.replace('dish_','')}">
+        <div class="gd-info">
+          <div class="name">No. ${g.dish.id.replace('dish_','')}</div>
+          <div class="sub">${Math.round(g.dish.kcal)} kcal · F ${g.dish.fat.toFixed(1)}g · C ${g.dish.carb.toFixed(1)}g · P ${g.dish.protein.toFixed(1)}g</div>
+        </div>
+        <span class="gd-count">${g.customs.length} รายการที่ match</span>
+        <button class="btn secondary group-select-all-btn" data-gi="${gi}" type="button" style="font-size:11.5px; padding:5px 10px; margin-left:8px; white-space:nowrap;">เลือกทั้งหมด</button>
+      </div>
+      <div class="match-group-customs">
+        ${g.customs.map((c, ci) => `
+          <label class="match-custom-row" for="mpcheck_${gi}_${ci}">
+            <input type="checkbox" class="match-pair-check" id="mpcheck_${gi}_${ci}"
+              data-custom-id="${c.id}" data-dish-id="${g.dish.id}">
+            <img src="${c.image}" alt="${c.label}">
+            <div class="mc-label">
+              <div class="name">${c.label}</div>
+              <div class="sub">${Math.round(c.kcal)} kcal · F ${c.fat.toFixed(1)}g · C ${c.carb.toFixed(1)}g · P ${c.protein.toFixed(1)}g</div>
+            </div>
+          </label>`).join('')}
+      </div>
+    </div>`).join('');
+
+  list.querySelectorAll('.match-pair-check').forEach(cb => {
+    cb.addEventListener('change', () => {
+      cb.closest('.match-custom-row').classList.toggle('selected', cb.checked);
+    });
+  });
+
+  list.querySelectorAll('.group-select-all-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      const group = btn.closest('.match-group');
+      const checks = group.querySelectorAll('.match-pair-check');
+      const allChecked = Array.from(checks).every(c => c.checked);
+      checks.forEach(c => {
+        c.checked = !allChecked;
+        c.closest('.match-custom-row').classList.toggle('selected', !allChecked);
+      });
+      btn.textContent = allChecked ? 'เลือกทั้งหมด' : 'ยกเลิกทั้งหมด';
+    });
+  });
+}
+
+document.getElementById('matchPairsSelectAllBtn').addEventListener('click', () => {
+  const checks = document.querySelectorAll('#matchPairsList .match-pair-check');
+  const allChecked = Array.from(checks).every(c => c.checked);
+  checks.forEach(c => {
+    c.checked = !allChecked;
+    c.closest('.match-pair-row').classList.toggle('selected', !allChecked);
+  });
+  document.getElementById('matchPairsSelectAllBtn').textContent = allChecked ? 'เลือกทั้งหมด' : 'ยกเลิกทั้งหมด';
+});
+
+function addCheckedToCompare(){
+  const checks = document.querySelectorAll('#matchPairsList .match-pair-check:checked');
+  if(checks.length === 0) return 0;
+  let added = 0;
+  checks.forEach(cb => {
+    const cid = cb.dataset.customId, did = cb.dataset.dishId;
+    if(!COMPARE.has(cid) && COMPARE.size < COMPARE_MAX){ COMPARE.add(cid); added++; }
+    if(!COMPARE.has(did) && COMPARE.size < COMPARE_MAX){ COMPARE.add(did); added++; }
+  });
+  return added;
+}
+
+document.getElementById('matchPairsConfirmBtn').addEventListener('click', () => {
+  const checks = document.querySelectorAll('#matchPairsList .match-pair-check:checked');
+  if(checks.length === 0) return;
+  const added = addCheckedToCompare();
+  updateCompareBar(added > 0 ? `เพิ่มเข้าเปรียบเทียบ ${checks.length} คู่แล้ว` : `เต็ม ${COMPARE_MAX} จานแล้วครับ`);
+  setTimeout(() => updateCompareBar(), 2500);
+  closeMatchPairsModal();
+});
+
+document.getElementById('matchPairsCompareNowBtn').addEventListener('click', () => {
+  const checks = document.querySelectorAll('#matchPairsList .match-pair-check:checked');
+  if(checks.length === 0) return;
+  addCheckedToCompare();
+  updateCompareBar();
+  closeMatchPairsModal();
+  openCompareModal();
+});
+
+function renderCustomLibraryList(){
+  if(CUSTOM_DISHES.length === 0){
+    customLibraryList.innerHTML = '<div class="savedset-empty">ยังไม่มีข้อมูลที่เพิ่มเอง — กด "+ เพิ่มข้อมูลใหม่" ด้านล่างเพื่อเริ่มต้น</div>';
+    return;
+  }
+  customLibraryList.innerHTML = CUSTOM_DISHES.slice().reverse().map(d => {
+    const inCompare = COMPARE.has(d.id);
+    return `
+      <div class="savedset-row">
+        <img class="thumb-sm view-custom-btn" src="${d.image}" alt="${d.label}" data-id="${d.id}" style="cursor:pointer;" title="ดูรายละเอียด">
+        <div class="meta view-custom-btn" data-id="${d.id}" style="cursor:pointer;">
+          <div class="name">${d.label}</div>
+          <div class="sub">${Math.round(d.kcal)} kcal · F ${d.fat.toFixed(1)}g · C ${d.carb.toFixed(1)}g · P ${d.protein.toFixed(1)}g${d.addedBy ? ` · เพิ่มโดย ${d.addedBy}` : ''}</div>
+        </div>
+        <button class="btn secondary toggle-compare-btn" data-id="${d.id}" type="button">${inCompare ? 'เอาออกจากเปรียบเทียบ' : 'เพิ่มเข้าเปรียบเทียบ'}</button>
+        <button class="btn secondary edit-custom-btn" data-id="${d.id}" type="button">แก้ไข</button>
+        <button class="btn secondary del-custom-btn" data-id="${d.id}" type="button">ลบ</button>
+      </div>`;
+  }).join('');
+}
+
+customLibraryList.addEventListener('click', e => {
+  const viewBtn = e.target.closest('.view-custom-btn');
+  const toggleBtn = e.target.closest('.toggle-compare-btn');
+  const editBtn = e.target.closest('.edit-custom-btn');
+  const delBtn = e.target.closest('.del-custom-btn');
+  if(viewBtn && !toggleBtn && !editBtn && !delBtn){
+    closeCustomLibraryModal();
+    openModal(viewBtn.dataset.id);
+    return;
+  }
+  if(editBtn){
+    const dish = CUSTOM_DISHES.find(d => d.id === editBtn.dataset.id);
+    if(dish){ closeCustomLibraryModal(); openCustomFormEdit(dish); }
+    return;
+  }
+  if(toggleBtn){
+    const id = toggleBtn.dataset.id;
+    if(COMPARE.has(id)){
+      removeFromCompare(id);
+    } else {
+      if(COMPARE.size >= COMPARE_MAX){
+        updateCompareBar(`เลือกได้สูงสุด ${COMPARE_MAX} จาน — เอาอันใดอันหนึ่งออกก่อนนะครับ`);
+      } else {
+        COMPARE.add(id);
+        updateCompareBar();
+      }
+    }
+    renderCustomLibraryList();
+  }
+  if(delBtn){
+    const id = delBtn.dataset.id;
+    CUSTOM_DISHES = CUSTOM_DISHES.filter(d => d.id !== id);
+    persistCustomDishes();
+    COMPARE.delete(id);
+    updateCompareBar();
+    renderCustomLibraryList();
+  }
+});
+
+// ---------- saved comparison sets ----------
+const SAVED_KEY = 'n5k_saved_comparisons';
+
+function getSavedComparisons(){
+  try { return JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); } catch(e){ return []; }
+}
+function setSavedComparisons(list){
+  try { localStorage.setItem(SAVED_KEY, JSON.stringify(list)); } catch(e){ console.error('Save failed', e); }
+}
+function snapshotCurrentCompare(){
+  return Array.from(COMPARE).map(id => findDish(id)).filter(Boolean).map(d => ({
+    id: d.id, label: dishLabel(d), kcal: d.kcal, mass: d.mass, fat: d.fat, carb: d.carb, protein: d.protein,
+    ingrText: d.ingrText || '', image: d.image, addedBy: d.addedBy || ''
+  }));
+}
+
+const saveNameModalBg = document.getElementById('saveNameModalBg');
+const savedSetsModalBg = document.getElementById('savedSetsModalBg');
+const savedSetsList = document.getElementById('savedSetsList');
+
+document.getElementById('compareSaveBtn').addEventListener('click', () => {
+  if(COMPARE.size === 0) return;
+  document.getElementById('saveNameInput').value = '';
+  saveNameModalBg.classList.add('open');
+  document.getElementById('saveNameInput').focus();
+});
+function closeSaveNameModal(){ saveNameModalBg.classList.remove('open'); }
+document.getElementById('closeSaveNameModalBtn').addEventListener('click', closeSaveNameModal);
+document.getElementById('saveNameCancelBtn').addEventListener('click', closeSaveNameModal);
+saveNameModalBg.addEventListener('click', e => { if(e.target === saveNameModalBg) closeSaveNameModal(); });
+document.getElementById('saveNameInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter') document.getElementById('saveNameConfirmBtn').click();
+});
+
+document.getElementById('saveNameConfirmBtn').addEventListener('click', () => {
+  const name = document.getElementById('saveNameInput').value.trim();
+  if(!name){ document.getElementById('saveNameInput').focus(); return; }
+  const items = snapshotCurrentCompare();
+  if(items.length === 0){ closeSaveNameModal(); return; }
+  const list = getSavedComparisons();
+  list.push({ id: 'set_' + Date.now(), name, savedAt: new Date().toISOString(), items });
+  setSavedComparisons(list);
+  closeSaveNameModal();
+  updateCompareBar(`บันทึก "${name}" แล้ว (${items.length} จาน)`);
+  setTimeout(() => updateCompareBar(), 1800);
+});
+
+function closeSavedSetsModal(){ savedSetsModalBg.classList.remove('open'); }
+document.getElementById('closeSavedSetsModalBtn').addEventListener('click', closeSavedSetsModal);
+savedSetsModalBg.addEventListener('click', e => { if(e.target === savedSetsModalBg) closeSavedSetsModal(); });
+
+document.getElementById('openSavedSetsBtn').addEventListener('click', () => {
+  renderSavedSetsList();
+  savedSetsModalBg.classList.add('open');
+});
+
+function renderSavedSetsList(){
+  const list = getSavedComparisons();
+  if(list.length === 0){
+    savedSetsList.innerHTML = '<div class="savedset-empty">ยังไม่มีชุดที่บันทึกไว้ — เลือกจานแล้วกด "บันทึกชุดนี้" ที่แถบด้านล่างก่อนนะครับ</div>';
+    return;
+  }
+  savedSetsList.innerHTML = list.slice().reverse().map(s => {
+    const dateLabel = new Date(s.savedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+    return `
+      <div class="savedset-row">
+        <div class="meta">
+          <div class="name">${s.name}</div>
+          <div class="sub">${dateLabel} · ${s.items.length} จาน</div>
+        </div>
+        <button class="btn secondary load-btn" data-id="${s.id}" type="button">โหลด</button>
+        <button class="btn secondary del-btn" data-id="${s.id}" type="button">ลบ</button>
+      </div>`;
+  }).join('');
+}
+
+savedSetsList.addEventListener('click', e => {
+  const loadBtn = e.target.closest('.load-btn');
+  const delBtn = e.target.closest('.del-btn');
+  if(loadBtn){ closeSavedSetsModal(); loadSavedComparison(loadBtn.dataset.id); }
+  if(delBtn){ deleteSavedComparison(delBtn.dataset.id); }
+});
+
+function loadSavedComparison(setId){
+  const list = getSavedComparisons();
+  const set = list.find(s => s.id === setId);
+  if(!set) return;
+  COMPARE.clear();
+  set.items.forEach(item => {
+    if(!CUSTOM_DISHES.find(x => x.id === item.id)) CUSTOM_DISHES.push(item);
+    COMPARE.add(item.id);
+  });
+  updateCompareBar();
+  openCompareModal();
+}
+
+function deleteSavedComparison(setId){
+  setSavedComparisons(getSavedComparisons().filter(s => s.id !== setId));
+  renderSavedSetsList();
+}
+
+(function initFromStorage(){
+  const snapshot = loadDishesSnapshot();
+  if(snapshot && snapshot.length > 0){
+    ALL_DISHES = snapshot;
+    dropzone.style.display = 'none';
+    document.getElementById('sourceStatus').textContent = `โหลดข้อมูลที่บันทึกไว้ (${snapshot.length} จาน)`;
+    applyFilters();
+  }
+  const saved = localStorage.getItem('n5k_sheet_url');
+  if(saved){
+    document.getElementById('sheetUrlInput').value = saved;
+    loadFromSheet(saved);
+  }
+})();
+
+// ---------- gallery ----------
+const galleryView = document.getElementById('galleryView');
+const galleryGrid = document.getElementById('galleryGrid');
+const mainEl = document.querySelector('main');
+const MARKS_KEY = 'n5k_gallery_marks';
+let GALLERY_MARKS = {}; // dishId → [{ by, at }]
+
+function loadMarksLocal(){
+  try { return JSON.parse(localStorage.getItem(MARKS_KEY) || '{}'); } catch(e){ return {}; }
+}
+function saveMarksLocal(){
+  try { localStorage.setItem(MARKS_KEY, JSON.stringify(GALLERY_MARKS)); } catch(e){}
+}
+
+async function loadMarksFromAPI(){
+  try {
+    const res = await fetch(GAS_URL + '?type=marks');
+    if(res.ok){
+      const data = await res.json();
+      if(Array.isArray(data)){
+        GALLERY_MARKS = {};
+        data.forEach(m => {
+          if(!GALLERY_MARKS[m.dishId]) GALLERY_MARKS[m.dishId] = [];
+          GALLERY_MARKS[m.dishId].push({ by: m.markedBy, at: m.markedAt });
+        });
+        saveMarksLocal();
+      }
+    }
+  } catch(e){ GALLERY_MARKS = loadMarksLocal(); }
+}
+
+async function syncMarksToAPI(){
+  try {
+    const flat = [];
+    Object.entries(GALLERY_MARKS).forEach(([dishId, list]) => {
+      list.forEach(m => flat.push({ dishId, markedBy: m.by, markedAt: m.at }));
+    });
+    await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'marks', marks: flat })
+    });
+  } catch(e){ console.warn('Marks sync failed', e); }
+}
+
+function addMark(dishId){
+  const by = CURRENT_USER_NAME || 'unknown';
+  const at = new Date().toISOString();
+  if(!GALLERY_MARKS[dishId]) GALLERY_MARKS[dishId] = [];
+  if(!GALLERY_MARKS[dishId].find(m => m.by === by)){
+    GALLERY_MARKS[dishId].push({ by, at });
+    saveMarksLocal();
+    syncMarksToAPI();
+    refreshGalleryMark(dishId);
+  }
+}
+
+function refreshGalleryMark(dishId){
+  const el = galleryGrid.querySelector(`.gallery-item[data-id="${dishId}"] .gallery-mark-multi`);
+  if(!el) return;
+  const marks = GALLERY_MARKS[dishId] || [];
+  el.innerHTML = marks.map(m => `<span class="gallery-mark-chip">✓ ${m.by}</span>`).join('');
+}
+
+async function copyToClipboard(text){ await navigator.clipboard.writeText(text); }
+
+async function copyImageToClipboard(url){
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+    return true;
+  } catch(e){
+    await navigator.clipboard.writeText(url);
+    return false;
+  }
+}
+
+function flashBtn(btn, label){
+  btn.textContent = '✓ Copied!';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = label; btn.classList.remove('copied'); }, 1500);
+}
+
+function renderGallery(){
+  GALLERY_MARKS = loadMarksLocal();
+  loadMarksFromAPI().then(() => {
+    galleryGrid.querySelectorAll('.gallery-item').forEach(el => {
+      refreshGalleryMark(el.dataset.id);
+    });
+  });
+
+  galleryGrid.innerHTML = ALL_DISHES.map(d => {
+    const marks = GALLERY_MARKS[d.id] || [];
+    const chips = marks.map(m => `<span class="gallery-mark-chip">✓ ${m.by}</span>`).join('');
+    return `
+      <div class="gallery-item" data-id="${d.id}">
+        <img src="${d.image}" loading="lazy" alt="${d.id}">
+        <div class="gallery-overlay">
+          <div class="g-id-row">${d.id.replace('dish_','')}</div>
+          <div class="g-actions">
+            <button class="gcopy-btn" data-action="id" data-id="${d.id}" type="button"># Copy ID</button>
+            <button class="gcopy-btn" data-action="img" data-url="${d.image}" data-id="${d.id}" type="button">🖼 Copy รูป</button>
+          </div>
+        </div>
+        <div class="gallery-mark-multi">${chips}</div>
+      </div>`;
+  }).join('');
+
+  galleryGrid.addEventListener('click', async e => {
+    const copyBtn = e.target.closest('.gcopy-btn');
+    if(copyBtn){
+      e.stopPropagation();
+      const action = copyBtn.dataset.action;
+      const dishId = copyBtn.dataset.id;
+      if(action === 'id'){
+        await copyToClipboard(dishId.replace('dish_',''));
+        flashBtn(copyBtn, '# Copy ID');
+      } else {
+        await copyImageToClipboard(copyBtn.dataset.url);
+        flashBtn(copyBtn, '🖼 Copy รูป');
+      }
+      addMark(dishId);
+      return;
+    }
+    const item = e.target.closest('.gallery-item');
+    if(item) openModal(item.dataset.id);
+  });
+}
+
+document.getElementById('viewExplorerBtn').addEventListener('click', () => {
+  mainEl.style.display = '';
+  galleryView.style.display = 'none';
+  document.getElementById('viewExplorerBtn').classList.add('active');
+  document.getElementById('viewGalleryBtn').classList.remove('active');
+});
+
+document.getElementById('viewGalleryBtn').addEventListener('click', () => {
+  mainEl.style.display = 'none';
+  galleryView.style.display = '';
+  document.getElementById('viewGalleryBtn').classList.add('active');
+  document.getElementById('viewExplorerBtn').classList.remove('active');
+  galleryGrid.innerHTML = '';
+  renderGallery();
+});
+
+// ---------- auth gate ----------
+const authGate = document.getElementById('authGate');
+const appRoot = document.getElementById('appRoot');
+const authError = document.getElementById('authError');
+const userPill = document.getElementById('userPill');
+const AUTH_KEY = 'bestfitt_user_email';
+
+function showApp(email){
+  authGate.style.display = 'none';
+  appRoot.style.display = 'block';
+  CURRENT_USER_NAME = email.split('@')[0];
+  userPill.innerHTML = `เข้าสู่ระบบ: ${email} <button id="logoutLink">ออกจากระบบ</button>`;
+  document.getElementById('logoutLink').onclick = () => {
+    localStorage.removeItem(AUTH_KEY);
+    location.reload();
+  };
+  initCustomDishesFromAPI();
+}
+function showGate(msg){
+  appRoot.style.display = 'none';
+  authGate.style.display = 'flex';
+  if(msg) authError.textContent = msg;
+}
+
+document.getElementById('loginBtn').onclick = () => {
+  authError.textContent = '';
+  const email = (document.getElementById('emailInput').value || '').trim().toLowerCase();
+  if(!email.endsWith('@muze.co.th')){
+    authError.textContent = 'อนุญาตเฉพาะอีเมลโดเมน @muze.co.th เท่านั้น';
+    return;
+  }
+  localStorage.setItem(AUTH_KEY, email);
+  showApp(email);
+};
+
+document.getElementById('emailInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter') document.getElementById('loginBtn').click();
+});
+
+// ตรวจสอบ session ที่เก็บไว้
+const savedEmail = localStorage.getItem(AUTH_KEY);
+if(savedEmail && savedEmail.endsWith('@muze.co.th')){
+  showApp(savedEmail);
+} else {
+  showGate();
+}
+</script>
+
+</body>
+</html>
