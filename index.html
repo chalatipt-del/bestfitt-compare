@@ -646,7 +646,8 @@ async function syncCustomDishesToAPI(){
   try {
     await fetch(GAS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ dishes: CUSTOM_DISHES.map(d => ({
         ...d,
         image: d.image && d.image.startsWith('data:') ? '' : (d.image || '')
@@ -1374,8 +1375,18 @@ function openMatchPairsModal(){
 }
 function closeMatchPairsModal(){ matchPairsModalBg.classList.remove('open'); }
 
-document.getElementById('closeMatchPairsModalBtn').addEventListener('click', closeMatchPairsModal);
-matchPairsModalBg.addEventListener('click', e => { if(e.target === matchPairsModalBg) closeMatchPairsModal(); });
+document.getElementById('closeMatchPairsModalBtn').addEventListener('click', () => {
+  closeMatchPairsModal();
+  renderCustomLibraryList();
+  customLibraryModalBg.classList.add('open');
+});
+matchPairsModalBg.addEventListener('click', e => {
+  if(e.target === matchPairsModalBg){
+    closeMatchPairsModal();
+    renderCustomLibraryList();
+    customLibraryModalBg.classList.add('open');
+  }
+});
 
 function renderMatchPairsList(){
   const groups = findAllMatches();
@@ -1387,7 +1398,7 @@ function renderMatchPairsList(){
   list.innerHTML = groups.map((g, gi) => `
     <div class="match-group">
       <div class="match-group-dish">
-        <img src="${g.dish.image}" alt="No. ${g.dish.id.replace('dish_','')}">
+        <img src="${imgSrc(g.dish.image)}" onerror="imgErr(this)" alt="No. ${g.dish.id.replace('dish_','')}">
         <div class="gd-info">
           <div class="name">No. ${g.dish.id.replace('dish_','')}</div>
           <div class="sub">${Math.round(g.dish.kcal)} kcal · F ${g.dish.fat.toFixed(1)}g · C ${g.dish.carb.toFixed(1)}g · P ${g.dish.protein.toFixed(1)}g</div>
@@ -1685,7 +1696,8 @@ async function syncMarksToAPI(){
     });
     await fetch(GAS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ type: 'marks', marks: flat })
     });
   } catch(e){ console.warn('Marks sync failed', e); }
@@ -1812,7 +1824,8 @@ window.__showApp = function(user) {
   // บันทึก login log ไป Google Sheets
   fetch(GAS_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({
       type: 'login_log',
       email: email,
