@@ -1805,6 +1805,17 @@ window.__showApp = function(user) {
   document.getElementById('logoutLink').onclick = () => {
     if(window.__firebaseSignOut) window.__firebaseSignOut();
   };
+  // บันทึก login log ไป Google Sheets
+  fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'login_log',
+      email: email,
+      name: user.displayName || '',
+      loginAt: new Date().toISOString()
+    })
+  }).catch(() => {});
   initCustomDishesFromAPI();
 };
 
