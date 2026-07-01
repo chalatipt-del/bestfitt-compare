@@ -609,7 +609,12 @@
         </div>
         <button class="closebtn" id="closeCustomLibraryModalBtn">✕</button>
       </div>
-      <div id="customLibraryList" style="margin-top:14px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; flex:1;"></div>
+      <div style="margin-top:14px; flex-shrink:0;">
+        <input type="text" id="customLibrarySearch" placeholder="ค้นหาชื่อ, เลขจาน, หรือชื่อคนเพิ่ม…"
+          style="width:100%; font-family:'IBM Plex Sans Thai',sans-serif; font-size:13.5px; padding:8px 12px;
+                 border:1px solid var(--line); border-radius:9px; background:var(--bg); color:var(--ink);">
+      </div>
+      <div id="customLibraryList" style="margin-top:10px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; flex:1;"></div>
       <div class="compare-actions" style="margin-top:0; padding-top:14px; border-top:1px solid var(--line); flex-shrink:0;">
         <button class="btn" id="libraryAddNewBtn" type="button">+ เพิ่มข้อมูลใหม่</button>
         <button class="btn secondary" id="libraryAutoMatchBtn" type="button">จับคู่อัตโนมัติทั้งหมด</button>
@@ -1415,6 +1420,12 @@ customLibraryModalBg.addEventListener('click', e => { if(e.target === customLibr
 document.getElementById('openCustomLibraryBtn').addEventListener('click', () => {
   renderCustomLibraryList();
   customLibraryModalBg.classList.add('open');
+  // clear search when opening
+  const s = document.getElementById('customLibrarySearch');
+  if(s) s.value = '';
+});
+document.getElementById('customLibrarySearch').addEventListener('input', () => {
+  renderCustomLibraryList();
 });
 document.getElementById('libraryAddNewBtn').addEventListener('click', () => {
   closeCustomLibraryModal();
@@ -1563,7 +1574,18 @@ function renderCustomLibraryList(){
     customLibraryList.innerHTML = '<div class="savedset-empty">ยังไม่มีข้อมูลที่เพิ่มเอง — กด "+ เพิ่มข้อมูลใหม่" ด้านล่างเพื่อเริ่มต้น</div>';
     return;
   }
-  customLibraryList.innerHTML = CUSTOM_DISHES.slice().reverse().map(d => {
+  const q = (document.getElementById('customLibrarySearch')?.value || '').trim().toLowerCase();
+  const filtered = CUSTOM_DISHES.slice().reverse().filter(d =>
+    !q ||
+    (d.label || '').toLowerCase().includes(q) ||
+    (d.id || '').toLowerCase().includes(q) ||
+    (d.addedBy || '').toLowerCase().includes(q)
+  );
+  if(filtered.length === 0){
+    customLibraryList.innerHTML = '<div class="savedset-empty">ไม่พบรายการที่ตรงกัน</div>';
+    return;
+  }
+  customLibraryList.innerHTML = filtered.map(d => {
     const inCompare = COMPARE.has(d.id);
     return `
       <div class="savedset-row">
