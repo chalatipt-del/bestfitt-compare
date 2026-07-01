@@ -349,6 +349,10 @@
   .savedset-row .meta .name{ font-weight:600; font-size:13.5px; }
   .savedset-row .meta .sub{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
   .savedset-empty{ color:var(--ink-soft); font-size:13px; text-align:center; padding:30px 0; }
+  .log-row{ padding:12px 14px; border:1px solid var(--line); border-radius:10px; display:flex; flex-direction:column; gap:6px; }
+  .log-row .log-meta{ font-size:12px; color:var(--ink-soft); }
+  .log-row .log-dishes{ font-size:13.5px; font-weight:600; }
+  .log-row .log-actions{ display:flex; gap:8px; margin-top:2px; flex-wrap:wrap; }
   .customform{ display:flex; flex-direction:column; gap:12px; margin-top:16px; }
   .formfield{ display:flex; flex-direction:column; gap:5px; font-size:12.5px; color:var(--ink-soft); }
   .formfield input{
@@ -481,6 +485,7 @@
     <button class="btn secondary" id="addCustomBtn" type="button">+ เพิ่มข้อมูลเปรียบเทียบ</button>
     <button class="btn secondary" id="openSavedSetsBtn" type="button">ชุดที่บันทึกไว้</button>
     <button class="btn secondary" id="openCustomLibraryBtn" type="button">ข้อมูลที่เพิ่มเอง</button>
+    <button class="btn secondary" id="openCompareLogBtn" type="button">ประวัติ Compare</button>
   </div>
   <div class="stats" id="statsLine"></div>
 </header>
@@ -638,6 +643,24 @@
         <button class="btn" id="matchPairsConfirmBtn" type="button">เพิ่มที่เลือกเข้าเปรียบเทียบ</button>
         <button class="btn" id="matchPairsCompareNowBtn" type="button" style="background:var(--protein); border-color:var(--protein);">เปรียบเทียบเลย</button>
         <button class="btn secondary" id="matchPairsSelectAllBtn" type="button">เลือกทั้งหมด</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="compareLogModalBg">
+  <div class="modal" id="compareLogModalCard" style="max-width:660px; max-height:82vh; display:flex; flex-direction:column;">
+    <div class="modal-body" style="display:flex; flex-direction:column; flex:1; min-height:0;">
+      <div class="modal-top">
+        <div>
+          <div class="modal-id">ประวัติ Compare</div>
+          <div style="font-size:12.5px; color:var(--ink-soft); margin-top:4px;" id="compareLogCount"></div>
+        </div>
+        <button class="closebtn" id="closeCompareLogBtn">✕</button>
+      </div>
+      <div id="compareLogList" style="margin-top:14px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; flex:1;"></div>
+      <div class="compare-actions" style="margin-top:0; padding-top:14px; border-top:1px solid var(--line); flex-shrink:0;">
+        <button class="btn secondary" id="compareLogExportAllBtn">Export ทั้งหมด เป็น CSV</button>
       </div>
     </div>
   </div>
@@ -1174,13 +1197,15 @@ function openCompareModal(){
         </table>
       </div>
       <div class="compare-actions">
-        <button class="btn" id="compareExportCsvBtn">ดาวน์โหลด CSV</button>
+        <button class="btn" id="compareSaveLogBtn">บันทึกผล</button>
+        <button class="btn secondary" id="compareExportCsvBtn">ดาวน์โหลด CSV</button>
         <button class="btn secondary" id="compareOpenSheetBtn">เปิด Google Sheets ใหม่</button>
       </div>
     </div>`;
 
   compareModalBg.classList.add('open');
   document.getElementById('closeCompareModalBtn').onclick = closeCompareModal;
+  document.getElementById('compareSaveLogBtn').onclick = () => saveComparisonLog(dishes);
   document.getElementById('compareExportCsvBtn').onclick = () => exportCompareCSV(dishes);
   document.getElementById('compareOpenSheetBtn').onclick = () => {
     // สร้าง TSV จากข้อมูลเพื่อวางใน Google Sheets
@@ -1947,6 +1972,150 @@ document.getElementById('viewGalleryBtn').addEventListener('click', () => {
   galleryPage = 0;
   renderGallery();
 });
+
+// ---------- comparison log ----------
+let COMPARE_LOG = []; // cached from GAS
+
+function saveComparisonLog(dishes){
+  const btn = document.getElementById('compareSaveLogBtn');
+  const sessionId = Date.now().toString();
+  const entry = {
+    sessionId,
+    savedBy: CURRENT_USER_NAME,
+    savedAt: new Date().toISOString(),
+    title: dishes.map(d => dishLabel(d)).join(' vs '),
+    dishesJSON: JSON.stringify(dishes.map(d => ({
+      id: d.id, label: dishLabel(d),
+      kcal: d.kcal, fat: d.fat, carb: d.carb, protein: d.protein,
+      mass: d.mass, ingrText: d.ingrText, isCustom: d.isCustom || false,
+      addedBy: d.addedBy || ''
+    })))
+  };
+  fetch(GAS_URL, {
+    method: 'POST', mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ type: 'comparison_log', ...entry })
+  }).catch(() => {});
+  btn.textContent = '✓ บันทึกแล้ว!';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = 'บันทึกผล'; btn.disabled = false; }, 2000);
+}
+
+async function loadComparisonLogFromGAS(){
+  try {
+    const res = await fetch(GAS_URL + '?type=comparison_log');
+    if(!res.ok) return;
+    const data = await res.json();
+    COMPARE_LOG = Array.isArray(data) ? data : [];
+  } catch(e){ COMPARE_LOG = []; }
+}
+
+function renderCompareLogModal(){
+  const list = document.getElementById('compareLogList');
+  const countEl = document.getElementById('compareLogCount');
+  if(COMPARE_LOG.length === 0){
+    list.innerHTML = '<div class="savedset-empty">ยังไม่มีประวัติการเปรียบเทียบ</div>';
+    countEl.textContent = '';
+    return;
+  }
+  countEl.textContent = `ทั้งหมด ${COMPARE_LOG.length} session`;
+  const sorted = [...COMPARE_LOG].reverse();
+  list.innerHTML = sorted.map(e => {
+    let dishes = [];
+    try { dishes = JSON.parse(e.dishesJSON || '[]'); } catch(_){}
+    const dt = e.savedAt ? new Date(e.savedAt).toLocaleString('th-TH') : '';
+    const names = dishes.map(d => d.label || d.id).join(', ');
+    return `<div class="log-row" data-sid="${e.sessionId}">
+      <div class="log-dishes">${names || e.title || '(ไม่มีชื่อ)'}</div>
+      <div class="log-meta">${dt}${e.savedBy ? ' · โดย ' + e.savedBy : ''} · ${dishes.length} จาน</div>
+      <div class="log-actions">
+        <button class="btn secondary log-reopen-btn" data-sid="${e.sessionId}" type="button" style="font-size:12px; padding:5px 10px;">ดูอีกครั้ง</button>
+        <button class="btn secondary log-csv-btn" data-sid="${e.sessionId}" type="button" style="font-size:12px; padding:5px 10px;">CSV</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.log-reopen-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const entry = COMPARE_LOG.find(e => e.sessionId === btn.dataset.sid);
+      if(!entry) return;
+      let dishes = [];
+      try { dishes = JSON.parse(entry.dishesJSON || '[]'); } catch(_){}
+      if(dishes.length === 0) return;
+      closeCompareLogModal();
+      // mark as custom so compare modal can render them
+      dishes.forEach(d => { if(!d.isCustom) d._logView = true; });
+      COMPARE.clear();
+      dishes.forEach(d => COMPARE.add(d.id));
+      // temporarily inject into custom dishes for modal rendering
+      const tempIds = dishes.filter(d => !findDish(d.id)).map(d => d.id);
+      const tempDishes = dishes.filter(d => !findDish(d.id)).map(d => ({...d, isCustom: true, _temp: true}));
+      CUSTOM_DISHES.push(...tempDishes);
+      openCompareModal();
+      CUSTOM_DISHES = CUSTOM_DISHES.filter(d => !d._temp);
+    });
+  });
+
+  list.querySelectorAll('.log-csv-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const entry = COMPARE_LOG.find(e => e.sessionId === btn.dataset.sid);
+      if(!entry) return;
+      let dishes = [];
+      try { dishes = JSON.parse(entry.dishesJSON || '[]'); } catch(_){}
+      exportLogEntryCSV(entry, dishes);
+    });
+  });
+}
+
+function exportLogEntryCSV(entry, dishes){
+  const headers = ['', ...dishes.map(d => d.label || d.id)];
+  const metrics = [
+    ['แคลอรี่ (kcal)', ...dishes.map(d => d.kcal)],
+    ['ไขมัน (g)', ...dishes.map(d => d.fat)],
+    ['คาร์บ (g)', ...dishes.map(d => d.carb)],
+    ['โปรตีน (g)', ...dishes.map(d => d.protein)],
+    ['น้ำหนักรวม (g)', ...dishes.map(d => d.mass)],
+    ['ส่วนผสม', ...dishes.map(d => d.ingrText || '')],
+    ['เพิ่มโดย', ...dishes.map(d => d.addedBy || '')],
+  ];
+  const dt = entry.savedAt ? new Date(entry.savedAt).toLocaleDateString('th-TH') : '';
+  const rows = [[`บันทึกเมื่อ: ${dt}`, `โดย: ${entry.savedBy||''}`], headers, ...metrics];
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv'});
+  const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:`compare_${entry.sessionId}.csv`});
+  a.click();
+}
+
+function exportAllCompareLogCSV(){
+  if(COMPARE_LOG.length === 0) return;
+  const allRows = [['session_id','saved_by','saved_at','dish_order','dish_label','kcal','fat','carb','protein','mass','ingr','is_ref']];
+  COMPARE_LOG.forEach(entry => {
+    let dishes = [];
+    try { dishes = JSON.parse(entry.dishesJSON || '[]'); } catch(_){}
+    dishes.forEach((d, i) => {
+      allRows.push([
+        entry.sessionId, entry.savedBy||'', entry.savedAt||'',
+        i+1, d.label||d.id, d.kcal, d.fat, d.carb, d.protein, d.mass||'',
+        d.ingrText||'', d.isCustom ? 'ไม่ใช่' : 'ต้นแบบ'
+      ]);
+    });
+  });
+  const csv = allRows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv'});
+  const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(blob), download:'compare_log_all.csv'});
+  a.click();
+}
+
+const compareLogModalBg = document.getElementById('compareLogModalBg');
+function openCompareLogModal(){
+  loadComparisonLogFromGAS().then(() => renderCompareLogModal());
+  compareLogModalBg.classList.add('open');
+}
+function closeCompareLogModal(){ compareLogModalBg.classList.remove('open'); }
+document.getElementById('closeCompareLogBtn').addEventListener('click', closeCompareLogModal);
+compareLogModalBg.addEventListener('click', e => { if(e.target === compareLogModalBg) closeCompareLogModal(); });
+document.getElementById('openCompareLogBtn').addEventListener('click', openCompareLogModal);
+document.getElementById('compareLogExportAllBtn').addEventListener('click', exportAllCompareLogCSV);
 
 // ---------- auth gate ----------
 const authGate = document.getElementById('authGate');
