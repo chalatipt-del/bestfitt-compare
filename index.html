@@ -1431,7 +1431,8 @@ document.getElementById('cfSaveBtn').addEventListener('click', () => {
     ingrText: document.getElementById('cfIngr').value.trim(),
     image: cfImageDataUrl || imageUrl || PLACEHOLDER_IMG,
     isCustom: true,
-    addedBy: CURRENT_USER_NAME || ''
+    addedBy: CURRENT_USER_NAME || '',
+    addedAt: new Date().toISOString()
   };
 
   CUSTOM_DISHES.push(dish);
@@ -1641,7 +1642,7 @@ function renderCustomLibraryList(){
         <img class="thumb-sm view-custom-btn" src="${imgSrc(d.image)}" onerror="imgErr(this)" alt="${d.label}" data-id="${d.id}" style="cursor:pointer;" title="ดูรายละเอียด">
         <div class="meta view-custom-btn" data-id="${d.id}" style="cursor:pointer;">
           <div class="name">${d.label}</div>
-          <div class="sub">${Math.round(d.kcal)} kcal · F ${d.fat.toFixed(1)}g · C ${d.carb.toFixed(1)}g · P ${d.protein.toFixed(1)}g${d.addedBy ? ` · เพิ่มโดย ${d.addedBy}` : ''}</div>
+          <div class="sub">${Math.round(d.kcal)} kcal · F ${d.fat.toFixed(1)}g · C ${d.carb.toFixed(1)}g · P ${d.protein.toFixed(1)}g${d.addedBy ? ` · โดย ${d.addedBy}` : ''}${d.addedAt ? ` · ${new Date(d.addedAt).toLocaleDateString('th-TH')}` : ''}</div>
         </div>
         <button class="btn secondary toggle-compare-btn" data-id="${d.id}" type="button">${inCompare ? 'เอาออกจากเปรียบเทียบ' : 'เพิ่มเข้าเปรียบเทียบ'}</button>
         <button class="btn secondary edit-custom-btn" data-id="${d.id}" type="button">แก้ไข</button>
