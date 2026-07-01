@@ -1189,9 +1189,19 @@ function openCompareModal(){
     const tsv = rows.map(r => r.join('\t')).join('\n');
     navigator.clipboard.writeText(tsv).then(() => {
       const btn = document.getElementById('compareOpenSheetBtn');
-      btn.textContent = '✓ Copy แล้ว! กำลังเปิด Sheets...';
+      btn.textContent = '✓ Copy แล้ว! เปิด Sheets → กด Cmd+V';
+      btn.style.background = 'var(--protein)';
+      btn.style.color = '#fff';
+      btn.style.borderColor = 'var(--protein)';
       btn.disabled = true;
-      setTimeout(() => { window.open('https://sheets.new', '_blank'); }, 600);
+      setTimeout(() => {
+        window.open('https://sheets.new', '_blank');
+        btn.textContent = 'เปิด Google Sheets ใหม่';
+        btn.style.background = '';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+        btn.disabled = false;
+      }, 1800);
     }).catch(() => { window.open('https://sheets.new', '_blank'); });
   };
 }
