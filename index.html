@@ -494,7 +494,7 @@
     <div class="toolbar-actions">
       <button class="btn accent" id="addCustomBtn" type="button">+ เพิ่มข้อมูล</button>
       <button class="btn secondary" id="openSavedSetsBtn" type="button">ชุดที่บันทึกไว้</button>
-      <button class="btn secondary" id="openCustomLibraryBtn" type="button">ข้อมูลที่เพิ่มเอง<span class="custom-badge" id="customBadge" style="display:none"></span></button>
+      <button class="btn secondary" id="openCustomLibraryBtn" type="button">ข้อมูลที่เพิ่มเอง</button>
       <button class="btn secondary" id="openCompareLogBtn" type="button">ประวัติ Compare</button>
     </div>
   </div>
@@ -621,7 +621,7 @@
       <div class="modal-top">
         <div>
           <div class="modal-id">ข้อมูลที่เพิ่มเอง (ไม่ใช่จาก CSV)</div>
-          <div style="font-size:12.5px; color:var(--ink-soft); margin-top:4px;">รายการที่กรอกไว้ผ่าน "เพิ่มข้อมูลเปรียบเทียบ" ทั้งหมด เก็บไว้ในเครื่องนี้</div>
+          <div id="customLibrarySubtitle" style="font-size:12.5px; color:var(--ink-soft); margin-top:4px;">รายการที่กรอกไว้ผ่าน "เพิ่มข้อมูลเปรียบเทียบ" เก็บไว้ในเครื่องนี้</div>
         </div>
         <button class="closebtn" id="closeCustomLibraryModalBtn">✕</button>
       </div>
@@ -1620,12 +1620,22 @@ document.getElementById('matchPairsCompareNowBtn').addEventListener('click', () 
 });
 
 function renderCustomLibraryList(){
+  // Update subtitle with total count
+  const subtitle = document.getElementById('customLibrarySubtitle');
+  if(subtitle) subtitle.textContent = `ทั้งหมด ${CUSTOM_DISHES.length} รายการ เก็บไว้ในเครื่องนี้`;
+
   if(CUSTOM_DISHES.length === 0){
     customLibraryList.innerHTML = '<div class="savedset-empty">ยังไม่มีข้อมูลที่เพิ่มเอง — กด "+ เพิ่มข้อมูลใหม่" ด้านล่างเพื่อเริ่มต้น</div>';
     return;
   }
   const q = (document.getElementById('customLibrarySearch')?.value || '').trim().toLowerCase();
-  const filtered = CUSTOM_DISHES.slice().reverse().filter(d =>
+  // Sort newest first by addedAt, fallback to reverse order
+  const sorted = CUSTOM_DISHES.slice().sort((a, b) => {
+    const ta = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+    const tb = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+    return tb - ta;
+  });
+  const filtered = sorted.filter(d =>
     !q ||
     (d.label || '').toLowerCase().includes(q) ||
     (d.id || '').toLowerCase().includes(q) ||
@@ -1635,10 +1645,11 @@ function renderCustomLibraryList(){
     customLibraryList.innerHTML = '<div class="savedset-empty">ไม่พบรายการที่ตรงกัน</div>';
     return;
   }
-  customLibraryList.innerHTML = filtered.map(d => {
+  customLibraryList.innerHTML = filtered.map((d, i) => {
     const inCompare = COMPARE.has(d.id);
     return `
       <div class="savedset-row">
+        <div style="font-size:12px; color:var(--ink-soft); min-width:28px; text-align:center; flex-shrink:0; font-weight:600;">#${i+1}</div>
         <img class="thumb-sm view-custom-btn" src="${imgSrc(d.image)}" onerror="imgErr(this)" alt="${d.label}" data-id="${d.id}" style="cursor:pointer;" title="ดูรายละเอียด">
         <div class="meta view-custom-btn" data-id="${d.id}" style="cursor:pointer;">
           <div class="name">${d.label}</div>
