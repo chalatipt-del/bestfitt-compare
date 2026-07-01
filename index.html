@@ -254,13 +254,22 @@
     font-size:9.5px; font-family:'IBM Plex Sans Thai',sans-serif;
     padding:2px 7px; border-radius:20px;
   }
-  .view-toggle{ display:flex; gap:6px; margin-left:auto; }
+  .view-toggle{ display:flex; gap:0; border:1px solid var(--line); border-radius:9px; overflow:hidden; }
   .view-toggle button{
     font-family:'IBM Plex Sans Thai',sans-serif; font-size:12.5px;
-    padding:6px 12px; border-radius:7px; border:1px solid var(--line);
+    padding:7px 14px; border:none; border-radius:0;
     background:transparent; color:var(--ink-soft); cursor:pointer;
   }
-  .view-toggle button.active{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  .view-toggle button + button{ border-left:1px solid var(--line); }
+  .view-toggle button.active{ background:var(--ink); color:var(--paper); }
+  .toolbar-actions{ display:flex; gap:6px; flex-wrap:wrap; margin-left:auto; align-items:center; }
+  .btn.accent{ background:var(--protein); border-color:var(--protein); color:var(--paper); }
+  .btn.accent:hover{ opacity:0.88; }
+  .custom-badge{
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:17px; height:17px; padding:0 5px; border-radius:20px;
+    background:var(--protein); color:#fff; font-size:10px; font-weight:600; margin-left:5px;
+  }
 
   /* ---------- modal ---------- */
   .modal-bg{
@@ -452,8 +461,8 @@
     <button class="btn secondary" id="pickFileBtn2">อัปโหลดไฟล์ CSV</button>
     <input type="file" id="fileInput" accept=".csv" style="display:none">
     <span class="filename" id="sourceStatus"></span>
+    <span class="source-by" id="sourceByLine" style="display:none"></span>
   </div>
-  <div class="source-by" id="sourceByLine" style="display:none"></div>
   <details class="howto">
     <summary>วิธีได้ลิงก์ Google Sheets (CSV)</summary>
     <ol>
@@ -464,7 +473,7 @@
     </ol>
   </details>
   <div class="toolbar">
-    <input type="text" id="search" placeholder="ค้นหาส่วนผสมหรือเลขจาน เช่น chicken, 1561662216" style="width:260px">
+    <input type="text" id="search" placeholder="ค้นหาส่วนผสมหรือเลขจาน เช่น chicken, 1561…" style="width:230px">
     <div class="numrange">
       <label class="field-label">แคลอรี่</label>
       <input type="number" id="kcalMin" placeholder="ต่ำสุด">
@@ -482,10 +491,12 @@
       <button id="viewExplorerBtn" class="active" type="button">Explorer</button>
       <button id="viewGalleryBtn" type="button">Gallery</button>
     </div>
-    <button class="btn secondary" id="addCustomBtn" type="button">+ เพิ่มข้อมูลเปรียบเทียบ</button>
-    <button class="btn secondary" id="openSavedSetsBtn" type="button">ชุดที่บันทึกไว้</button>
-    <button class="btn secondary" id="openCustomLibraryBtn" type="button">ข้อมูลที่เพิ่มเอง</button>
-    <button class="btn secondary" id="openCompareLogBtn" type="button">ประวัติ Compare</button>
+    <div class="toolbar-actions">
+      <button class="btn accent" id="addCustomBtn" type="button">+ เพิ่มข้อมูล</button>
+      <button class="btn secondary" id="openSavedSetsBtn" type="button">ชุดที่บันทึกไว้</button>
+      <button class="btn secondary" id="openCustomLibraryBtn" type="button">ข้อมูลที่เพิ่มเอง<span class="custom-badge" id="customBadge" style="display:none"></span></button>
+      <button class="btn secondary" id="openCompareLogBtn" type="button">ประวัติ Compare</button>
+    </div>
   </div>
   <div class="stats" id="statsLine"></div>
 </header>
@@ -686,6 +697,18 @@ function loadCustomDishesFromStorage(){
 function persistCustomDishes(){
   try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(CUSTOM_DISHES)); } catch(e){}
   syncCustomDishesToAPI();
+  updateCustomBadge();
+}
+
+function updateCustomBadge(){
+  const badge = document.getElementById('customBadge');
+  if(!badge) return;
+  if(CUSTOM_DISHES.length > 0){
+    badge.textContent = CUSTOM_DISHES.length;
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 async function syncCustomDishesToAPI(){
   try {
@@ -719,6 +742,7 @@ async function initCustomDishesFromAPI(){
     }
   } catch(e){ console.warn('API load failed, using localStorage', e); }
   CUSTOM_DISHES = CUSTOM_DISHES.length ? CUSTOM_DISHES : loadCustomDishesFromStorage();
+  updateCustomBadge();
   // โหลด shared data source
   fetchDataSourceFromGAS();
 }
