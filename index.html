@@ -816,7 +816,7 @@ function cardHTML(d){
   return `
     <div class="card${isSelected ? ' compare-selected' : ''}" data-id="${d.id}" tabindex="0">
       <div class="imgwrap">
-        <img src="${d.image}" loading="lazy" alt="จานอาหาร ${d.id}">
+        <img src="${imgSrc(d.image)}" onerror="imgErr(this)" loading="lazy" alt="จานอาหาร ${d.id}">
         <span class="tag">No. ${d.id.replace('dish_','')}</span>
         <span class="compare-toggle${isSelected ? ' active' : ''}" data-compare-id="${d.id}" title="เลือกเพื่อเปรียบเทียบ">${isSelected ? '✓' : '+'}</span>
       </div>
@@ -909,7 +909,7 @@ function openModal(id){
         <button class="btn secondary" id="addCompareForThisBtn" type="button">+ เพิ่มข้อมูลเปรียบเทียบสำหรับจานนี้</button>
       </div>`;
   modalCard.innerHTML = `
-    <img class="modal-img" src="${d.image}" alt="${titleLabel}">
+    <img class="modal-img" src="${imgSrc(d.image)}" onerror="imgErr(this)" alt="${titleLabel}">
     <div class="modal-body">
       <div class="modal-top">
         <div>
@@ -983,7 +983,7 @@ function updateCompareBar(flashMsg){
     const d = findDish(id);
     if(!d) return '';
     return `<span class="compare-thumb-wrap" data-remove-id="${id}" title="คลิกเพื่อเอาออกจากการเปรียบเทียบ">
-      <img src="${d.image}" alt="${dishLabel(d)}">
+      <img src="${imgSrc(d.image)}" onerror="imgErr(this)" alt="${dishLabel(d)}">
       <span class="x">✕</span>
     </span>`;
   }).join('');
@@ -1038,7 +1038,7 @@ function openCompareModal(){
       ${dishes.map((d, i) => `
         <th class="dishcol${!d.isCustom ? ' ref-col' : ''}">
           ${!d.isCustom ? '<div class="ref-badge">ต้นแบบ</div>' : ''}
-          <img class="thumb" src="${d.image}" alt="${dishLabel(d)}">
+          <img class="thumb" src="${imgSrc(d.image)}" onerror="imgErr(this)" alt="${dishLabel(d)}">
           <span class="dishid">${dishLabel(d)}</span>
         </th>`).join('')}
     </tr>`;
@@ -1055,7 +1055,9 @@ function openCompareModal(){
           const v = d[m.key];
           const isBest = bestVal !== null && v === bestVal;
           let pctHtml = '';
-          if(bestVal !== null && bestVal !== 0){
+          if(!d.isCustom){
+            // ต้นแบบ — ไม่แสดง %
+          } else if(bestVal !== null && bestVal !== 0){
             if(isBest){
               pctHtml = `<div class="compare-pct best">ดีที่สุด</div>`;
             } else {
@@ -1172,8 +1174,10 @@ function exportCompareCSV(dishes){
 
 // ---------- custom (non-CSV) comparison entries ----------
 const PLACEHOLDER_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect width="100%" height="100%" fill="%23DCE3D5"/></svg>'
+  '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect width="100%" height="100%" fill="%23DCE3D5"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="13" fill="%23999" font-family="sans-serif">No Image</text></svg>'
 );
+function imgSrc(url){ return url && url.trim() ? url : PLACEHOLDER_IMG; }
+function imgErr(el){ el.onerror=null; el.src=PLACEHOLDER_IMG; }
 
 const customModalBg = document.getElementById('customModalBg');
 let cfImageDataUrl = '';
@@ -1475,7 +1479,7 @@ function renderCustomLibraryList(){
     const inCompare = COMPARE.has(d.id);
     return `
       <div class="savedset-row">
-        <img class="thumb-sm view-custom-btn" src="${d.image}" alt="${d.label}" data-id="${d.id}" style="cursor:pointer;" title="ดูรายละเอียด">
+        <img class="thumb-sm view-custom-btn" src="${imgSrc(d.image)}" onerror="imgErr(this)" alt="${d.label}" data-id="${d.id}" style="cursor:pointer;" title="ดูรายละเอียด">
         <div class="meta view-custom-btn" data-id="${d.id}" style="cursor:pointer;">
           <div class="name">${d.label}</div>
           <div class="sub">${Math.round(d.kcal)} kcal · F ${d.fat.toFixed(1)}g · C ${d.carb.toFixed(1)}g · P ${d.protein.toFixed(1)}g${d.addedBy ? ` · เพิ่มโดย ${d.addedBy}` : ''}</div>
@@ -1739,7 +1743,7 @@ function renderGallery(){
     const chips = marks.map(m => `<span class="gallery-mark-chip">✓ ${m.by}</span>`).join('');
     return `
       <div class="gallery-item" data-id="${d.id}">
-        <img src="${d.image}" loading="lazy" alt="${d.id}">
+        <img src="${imgSrc(d.image)}" onerror="imgErr(this)" loading="lazy" alt="${d.id}">
         <div class="gallery-overlay">
           <div class="g-id-row">${d.id.replace('dish_','')}</div>
           <div class="g-actions">
